@@ -10,11 +10,70 @@
 | Erstklassifikation | `unclassified` per `app-log-triage` Common-Issues-Katalog (kein Pattern matched 1:1) |
 | Sanity-Probe | nicht abschließend durchgeführt — `gst-plugin-webrtc-rust` fehlt im direct-mode-Pfad des `apps_venv`. Daemon-hosted Demo (Option A aus dem Triage-Bericht) als Folge-Schritt offen. |
 | Vergleichsdatum | Nutzeraussage „andere Apps haben das Problem nicht so extrem" → Hardware-/Daemon-Schaden unwahrscheinlich; App-spezifischer Code-Pfad. |
-| Status | OFFENE HYPOTHESE — kein Code-Change am Verdacht selbst, nur Diagnose-Log eingebaut |
+| Status | **HYPOTHESE TEILWEISE WIDERLEGT** durch Live-Daten vom 2026-05-07T23:33Z — siehe Update-Block unten. Initiale Sekundär-Quellen-Hypothese ist nicht der Trigger; Primary-Pose-Achsen-Kombination ist der eigentliche Auslöser. |
 
 ---
 
-## Hypothese (high confidence)
+## Update 2026-05-07T23:33Z — Live-Diagnose-Daten nach Roll-out des `[POSE_DUMP]`-Logs
+
+**Setup:** Diagnose-Log via Hot-Patch (scp + `pip install`-frei) auf `/venvs/apps_venv/lib/python3.12/site-packages/reachy_mini_home_assistant/motion/control_runtime.py` deployt; pyc invalidiert; App-Restart über Pollen-API. Service-Down-Fenster ~10 s.
+
+**Erfasste Datenmenge:**
+
+| Metrik | 60-s-Fenster ab 23:33:01 |
+|---|---|
+| `[POSE_DUMP]`-Lines | 50 (= 1 Hz wie konfiguriert) |
+| `Collision detected` (post-Throttling) | 52 (= ~0,87 Hz, höher als die ~0,4 Hz aus dem Erst-Triage) |
+| `anim_*` ≠ 0 | nie |
+| `sway_*` ≠ 0 | nie |
+| `face_offsets` ≠ 0 | nie |
+| `state` | ausschließlich `IDLE` |
+
+**Interpretation:** Bei reinem Idle-Betrieb ohne Voice-Pipeline-Aktivität und ohne aktives Face-Tracking sind alle drei sekundären Pose-Quellen exakt 0,0. Die Initial-Hypothese (additive Sekundär-Quellen-Summe als Trigger) **kann diesen Datenpunkt nicht erklären** und ist damit für den hier dominanten Symptom-Modus nicht der Auslöser.
+
+**Tatsächlich beobachteter Trigger** — zwei klar getrennte Phasen:
+
+```
+Phase 1 (23:33:11 → 23:33:22, ~11 s nach App-Start):
+  primary=(-0.021, +0.001, -0.044 | r+0.000, p+0.426, y+0.000)
+  → KEINE Collisions in diesem Fenster.
+  Reine Idle-Rest-Pose: pitch ≈ 24,4° (aus _idle_rest_head_pitch_rad), yaw 0.
+
+Phase 2 (zwischen 23:33:22 und 23:33:51, vermutlich beim ersten look_around):
+  primary=(-0.021, +0.001, +0.025 | r+0.000, p+0.426, y+1.152)
+  → ~0,87 Hz Collisions, konstant. Robot bleibt in dieser Pose stuck.
+  yaw ≈ 66° kommt hinzu, pitch bleibt auf 24,4°.
+```
+
+**Korrigierte Hypothese (high confidence):** Das Symptom ist **kombinatorische Erreichbarkeit** der Primary-Pose, nicht Sekundär-Quellen-Summe. Einzelachsen-Werte sind je für sich innerhalb der Limits (Pitch 24°, Yaw 66°, beide unterhalb von `clamp_body_yaw`-Limit ±160°). Aber die **Pose-Kombination** Pitch×Yaw überschreitet die mechanische Sphäre des Reachy-Mini-Kopfes.
+
+**Verdächtige Code-Stelle für Phase 2 — `reachy_mini_home_assistant/motion/idle_runtime.py:143-144`:**
+
+```python
+target_yaw = random.uniform(-yaw_range_deg, yaw_range_deg)
+target_pitch = random.uniform(-pitch_range_deg, pitch_range_deg)
+```
+
+Beide Achsen werden parallel auf Random-Werte gesetzt, ohne Reachability-Check der Kombination. Außerdem wird der Idle-Rest-Pitch (24,4°) bei einem look_around **nicht zurückgesetzt**, bevor der neue Yaw aufgesattelt wird.
+
+**Was die Initial-Hypothese richtig hatte:**
+
+- **Fehlender Reachability-Check vor `set_target`** ist weiterhin der Strukturmangel. Der Trigger (Primary-Kombination vs. Sekundär-Summe) ist nur eine andere Variante derselben fehlenden Schutzschicht.
+- **Fix-Option-2 (Reachability-Check via SDK)** ist jetzt **erste Wahl**, weil sie unabhängig vom konkreten Trigger funktioniert.
+- **Fix-Option-1 (Pre-Clamp pro Achse)** ist **disqualifiziert** — Einzelachsen-Werte sind innerhalb der Limits, das Problem ist kombinatorisch.
+
+**Voraussichtlich noch nicht beobachtet:** Voice-Pipeline-aktiver Modus (sway ≠ 0, ggf. face ≠ 0) — die Live-Daten umfassen nur Idle. Bei aktivem Voice könnte sich das Symptom *zusätzlich* verschärfen. Folge-Schritt: ~30-60 min Realbetrieb mit Voice-Triggern, dann Re-Auswertung.
+
+**SDK-Recherche-Stand (parallel zum Audit-Update):**
+- `ReachyMini` exponiert keine direkte `is_reachable(pose)`-Methode.
+- `reachy_mini.kinematics` hat vier Solver-Klassen: `AnalyticalKinematics`, `PlacoKinematics`, `MockupPlacoKinematics`, `NNKinematics`.
+- Kommentar in `pose_composer.py:24` referenziert `inverse_kinematics_safe` — diese Methode gehört vermutlich zu einer der Solver-Klassen. Detail-Recherche steht aus, bevor der Reachability-Wrapper implementiert werden kann.
+
+**Status nach diesem Update:** Audit weiter OFFEN; Diagnose-Log läuft auf dem Gerät; `_dump_pose_components` weiter aktiv; Fix-Implementation **wartet auf Voice-Pipeline-Daten** plus die genaue SDK-API-Methode.
+
+---
+
+## Hypothese (initial, durch Live-Daten teilweise widerlegt — siehe Update-Block oben)
 
 In `reachy_mini_home_assistant/motion/control_runtime.py` (`compose_final_pose`, Zeilen 67-122) und der parallelen Funktion in `reachy_mini_home_assistant/motion/pose_composer.py` (`compose_full_pose`, Zeilen 132-193) werden drei sekundäre Pose-Quellen pro Achse **additiv** kombiniert, *bevor* die 4×4-Matrix gebaut wird:
 
