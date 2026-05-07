@@ -73,6 +73,59 @@ Beide Achsen werden parallel auf Random-Werte gesetzt, ohne Reachability-Check d
 
 ---
 
+## Update 2026-05-07T23:48Z — Fix implementiert und initial verifiziert
+
+**Hintergrund:** Auf Wunsch des Auditors „direkt fixen" implementiert, ohne auf Voice-Pipeline-Daten zu warten. Begründung: Reachability-Check ist Trigger-unabhängig — er fängt sowohl die Idle-`look_around`-Kombination als auch potenzielle Voice-bedingte Sekundär-Quellen-Summen ab.
+
+**SDK-API-Erkundung abgeschlossen:**
+
+```python
+from reachy_mini.kinematics import AnalyticalKinematics
+
+ik_engine = AnalyticalKinematics()
+joints = ik_engine.ik(pose_4x4, body_yaw=float, check_collision=True)
+# Returns ndarray[(7,)]; np.isnan(joints).any() => unreachable / collides.
+```
+
+Empirisch verifiziert mit der live beobachteten Bad-Pose (`pitch=0.426, yaw=1.152`): NaN-Array zurück. Mit Idle-Rest allein (`pitch=0.426, yaw=0.0`): 7 sinnvolle Joint-Angles. Performance: 0,04 ms / Call (40 µs) — bei 100 Hz Loop = 0,4 % CPU-Overhead.
+
+**Fix in `reachy_mini_home_assistant/motion/control_runtime.py`** (Commit `6a3e7ce`):
+
+- Helper `_get_ik_safety_engine(manager)`: lazy-init `AnalyticalKinematics`-Instanz pro `MovementManager`.
+- Helper `_check_pose_reachable(manager, head_pose, body_yaw)`: ruft `ik(...)` auf, prüft `np.isnan(joints).any()`. Fail-open bei internen Fehlern.
+- Helper `_log_unreachable_throttled(manager)`: 1 Hz throttled `[POSE_GUARD]`-Warning auf WARNING-Level.
+- Aufruf in `compose_final_pose` direkt vor `return`: bei reachable → cache `_last_reachable_head_pose = final_head.copy()`, bei unreachable → ersetze `final_head` durch zwischengespeicherte letzte gültige Pose, throttled Log.
+
+**Initiale Verifikation (75 s nach Restart, 23:46:46 → 23:48:01):**
+
+| Metrik | Vor Fix (60 s) | Nach Fix (75 s) |
+|---|---|---|
+| `Collision detected` (post-Throttling) | 52 | **0** |
+| `POSE_GUARD`-Warnings | n/a | 0 |
+| `POSE_DUMP`-Lines | 50/min | 54/min (kein Drift) |
+| Aktuelle Pose im Log | stuck bei `pitch=0.426, yaw=1.152` | `pitch=0.426, yaw=0.000` (Idle-Rest) |
+
+**Kausalität:** 100 % Reduktion der `Collision detected`-Lines im 75-s-Beobachtungsfenster. `POSE_GUARD = 0` heißt, dass in dem Fenster keine unreachable Pose generiert wurde — d. h. die App hat (zufallsbedingt) keinen `look_around` mit kritischer Pitch×Yaw-Kombination produziert. Damit ist der **Save-Mechanismus selbst noch nicht direkt unter Last verifiziert**.
+
+**Folgerung:**
+
+- **Symptom-Verschwindung:** belegt für den am häufigsten beobachteten Modus (Idle ohne Voice).
+- **Save-Mechanismus-Aktivität:** indirekt durch Hypothesen-Konsistenz wahrscheinlich, aber noch nicht durch eine konkrete `[POSE_GUARD]`-Line bestätigt.
+
+**Empfohlene weitere Verifikation:**
+
+1. Längere Beobachtung (60+ Min) mit normalem Idle-Verhalten — wenn `POSE_GUARD`-Lines auftreten, ist der Save-Mechanismus im Einsatz.
+2. Voice-Pipeline-Tests: mehrere Wake-Word-Trigger plus Bewegung vor der Kamera, um sway+face-Quellen zu aktivieren. `Collision detected` muss weiterhin 0 bleiben, `POSE_GUARD` darf auftreten.
+3. Falls `POSE_GUARD`-Lines mit hoher Rate auftreten, weist das auf einen zu engen Reachable-Volume-Schätzer in `AnalyticalKinematics` hin (Daemon nutzt vermutlich dieselbe Engine, sollte konsistent sein) — dann müssen wir untersuchen.
+4. **Diagnose-Log entfernen** (`_dump_pose_components` plus dessen Aufruf) erst nach Abschluss der Verifikation. Aktueller Code-Comment markiert das als „Remove once …".
+
+**Nicht im Fix enthalten (für eigene Folge-PRs):**
+
+- Klassen-Umbenennung `ReachyMiniHaVoice` → `ReachyMiniHomeAssistant` für Pollen-Validator-Konformität (orthogonal, gehört nicht in `fix/rotation-prob`).
+- Eigentliche Korrektur der `idle_runtime.update_idle_look_around` (Zeilen 143-144) — die unmögliche Pitch×Yaw-Kombination wird jetzt zwar abgefangen, aber besser wäre, sie gar nicht erst zu produzieren (z. B. Pitch beim look_around auf 0 setzen). Das ist eine UX-Optimierung, kein Korrektheits-Fix.
+
+---
+
 ## Hypothese (initial, durch Live-Daten teilweise widerlegt — siehe Update-Block oben)
 
 In `reachy_mini_home_assistant/motion/control_runtime.py` (`compose_final_pose`, Zeilen 67-122) und der parallelen Funktion in `reachy_mini_home_assistant/motion/pose_composer.py` (`compose_full_pose`, Zeilen 132-193) werden drei sekundäre Pose-Quellen pro Achse **additiv** kombiniert, *bevor* die 4×4-Matrix gebaut wird:
