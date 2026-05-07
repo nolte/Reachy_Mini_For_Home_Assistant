@@ -58,6 +58,11 @@ config.json
 htmlcov/
 .tox/
 
+# Auto-generated agent audit artifacts (deploy logs, on-device telemetry).
+# Manually authored audits (security-review/, log-triage/, ...) stay tracked.
+.audits/deploy/
+.audits/on-device/
+
 # Audio (exclude package bundled files)
 *.wav
 *.mp3
