@@ -126,6 +126,58 @@ Empirisch verifiziert mit der live beobachteten Bad-Pose (`pitch=0.426, yaw=1.15
 
 ---
 
+## Update 2026-05-08T16:50Z — Zwei zusätzliche Bugs entdeckt und behoben
+
+Während der Verifikations-Phase des Reachability-Fixes über mehrere Diagnose-Sessions traten zwei voneinander unabhängige Bugs zu Tage, die mit dem Rotation-Symptom zusammenhängen, aber eigene Wurzeln haben:
+
+### Bug #2 — Hardware-Daemon-Stale-State nach mehreren App-Stop/Start-Zyklen
+
+Nach mehrfachem Stop/Start-Zyklen der App über die Pollen-API (für Hot-Patch-Deploys während der Diagnose) ging die App in eine Crash-Schleife mit `ConnectionError: Could not connect to daemon on localhost`. Das `reachy-mini-daemon.service` blieb dabei `active (running)`, akzeptierte aber keine neuen WebSocket-Verbindungen mehr — vermutlich Stale-State im internen Connection-Manager des Hardware-Daemons.
+
+**Recovery:** `sudo systemctl restart reachy-mini-daemon.service` plus anschließender App-Start. Service-Down-Fenster ~30-60 s. Passwordless-Sudo war auf dem Wireless-Setup vorhanden.
+
+**Lesson für künftige Diagnose-Sessions:** Häufige Hot-Patch-Cycles sind nicht harmlos — entweder ausreichend Cooldown zwischen Stop/Start-Zyklen lassen (~30 s) oder den Hardware-Daemon-Restart als Reset-Mechanismus parat halten.
+
+### Bug #3 — HA-NumberEntity-Slider Off-by-one-Echo bei Antennen
+
+**Symptom:** Slider-Push in HA → Antenne bewegt sich physisch korrekt, aber der Slider in HA's UI springt visuell auf den vorherigen Wert zurück. Bei jedem weiteren Push wandert der Slider um genau einen Schritt hinter der tatsächlichen Position her.
+
+**Wurzel:** Async-Race in `entity.NumberEntity.handle_message` zwischen Setter und Getter:
+
+```python
+elif isinstance(msg, NumberCommandRequest) and msg.key == self.key:
+    self.value = msg.state            # Setter: pusht Command auf MovementManager._command_queue
+    yield self._get_state_message()   # Getter: liest state.target_antenna_*  IMMEDIATELY
+```
+
+Der Setter ruft `MovementManager.set_target_pose(antenna_left=...)`, was nur einen Eintrag in eine asynchrone `_command_queue` schreibt. Der State wird erst beim nächsten 100-Hz-`_poll_commands()`-Tick aktualisiert. Im selben handle_message-Block liest der Getter aber sofort den noch-nicht-aktualisierten State und meldet diesen Wert als „aktuellen Stand" an HA zurück → off-by-one.
+
+**Fix in `reachy_controller.py:set_antenna_left/right` (Commit `2e4fadd`):** Synchroner Direkt-Schreib in `state.target_antenna_*` zusätzlich zur Queue-Übergabe. Plus Getter (vorbereitend) auf App-State (`state.target_antenna_*`) statt Hardware-Read umgestellt — der Hardware-Read war der ursprüngliche Auslöser des „echo back to lagging servo position"-Effekts.
+
+**Latente Bugs gleicher Art:** `set_head_x/y/z/roll/pitch/yaw` und `set_body_yaw` haben das **exakt gleiche Async-Pattern** und sind sehr wahrscheinlich ebenso betroffen — aber nicht im Scope dieses Branches. Ein eigener Audit/Fix wird empfohlen, sobald jemand das Symptom an einem der Head-Slider beobachtet.
+
+### Reachability-Gate weiterhin verifiziert
+
+Nach Cleanup des Diagnose-Logs (Commit `b8c73a9`) und Antennen-Fix (Commit `2e4fadd`) zeigt die App stabil:
+- `Collision detected` 0/min (vorher 52/min)
+- `[POSE_GUARD]` 0/min (Save-Mechanismus nicht ausgelöst — alle aktuell generierten Posen sind erreichbar)
+- HA-Slider stehen auf gewählten Werten, Antennen folgen physisch
+
+### Branch-Stand zum Zeitpunkt des Audit-Updates
+
+7 Commits über `develop`:
+1. `46a70fa` POSE_DUMP-Diagnostic einbauen
+2. `f6fa236` `.gitignore`-Audit-Hygiene
+3. `9a4debb` Hypothese mit Live-Daten korrigieren
+4. `6a3e7ce` **Reachability-Gate (Hauptfix)**
+5. `82e96f4` Verifikation dokumentieren
+6. `b8c73a9` POSE_DUMP-Diagnostic entfernen (Cleanup)
+7. `2e4fadd` **Antennen-Off-by-one-Fix**
+
+**Status der Audit-Datei nach diesem Update:** Drei Bug-Klassen identifiziert und für `fix/rotation-prob` behoben. Branch ist `ready-for-PR` auf develop.
+
+---
+
 ## Hypothese (initial, durch Live-Daten teilweise widerlegt — siehe Update-Block oben)
 
 In `reachy_mini_home_assistant/motion/control_runtime.py` (`compose_final_pose`, Zeilen 67-122) und der parallelen Funktion in `reachy_mini_home_assistant/motion/pose_composer.py` (`compose_full_pose`, Zeilen 132-193) werden drei sekundäre Pose-Quellen pro Achse **additiv** kombiniert, *bevor* die 4×4-Matrix gebaut wird:
