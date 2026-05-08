@@ -67,37 +67,6 @@ def _log_unreachable_throttled(manager: "MovementManager") -> None:
     manager._last_unreachable_log_ts = now
 
 
-def _dump_pose_components(
-    manager: "MovementManager",
-    face_offsets: tuple[float, float, float, float, float, float],
-    anim_blend: float,
-) -> None:
-    # Throttled diagnostic dump correlating pose composition sources with
-    # daemon-side "IK error: Collision detected" warnings. See
-    # .audits/log-triage/2026-05-07-rotation-prob-hypothesis.md — remove
-    # once the bounds calibration in compose_final_pose has landed.
-    now = manager._now()
-    if (now - getattr(manager, "_last_pose_dump_ts", 0.0)) <= 1.0:
-        return
-    s = manager.state
-    logger.info(
-        "[POSE_DUMP] anim=(%+.3f,%+.3f,%+.3f|r%+.3f,p%+.3f,y%+.3f)x%.2f "
-        "sway=(%+.3f,%+.3f,%+.3f|r%+.3f,p%+.3f,y%+.3f) "
-        "face=(%+.3f,%+.3f,%+.3f|r%+.3f,p%+.3f,y%+.3f) "
-        "primary=(%+.3f,%+.3f,%+.3f|r%+.3f,p%+.3f,y%+.3f) state=%s",
-        s.anim_x, s.anim_y, s.anim_z,
-        s.anim_roll, s.anim_pitch, s.anim_yaw, anim_blend,
-        s.sway_x, s.sway_y, s.sway_z,
-        s.sway_roll, s.sway_pitch, s.sway_yaw,
-        face_offsets[0], face_offsets[1], face_offsets[2],
-        face_offsets[3], face_offsets[4], face_offsets[5],
-        s.target_x, s.target_y, s.target_z,
-        s.target_roll, s.target_pitch, s.target_yaw,
-        getattr(s.robot_state, "name", s.robot_state),
-    )
-    manager._last_pose_dump_ts = now
-
-
 def update_face_tracking(manager: "MovementManager", face_detected_threshold: float) -> None:
     if manager._camera_server is None:
         return
@@ -155,7 +124,6 @@ def compose_final_pose(manager: "MovementManager") -> tuple[np.ndarray, tuple[fl
     with manager._face_tracking_lock:
         face_offsets = manager._face_tracking_offsets
     anim_blend = manager.state.animation_blend
-    _dump_pose_components(manager, face_offsets, anim_blend)
     secondary_head = create_head_pose_matrix(
         x=manager.state.anim_x * anim_blend + manager.state.sway_x + face_offsets[0],
         y=manager.state.anim_y * anim_blend + manager.state.sway_y + face_offsets[1],
