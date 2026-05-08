@@ -19,6 +19,54 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get_ik_safety_engine(manager: "MovementManager"):
+    # Lazy init of an app-side AnalyticalKinematics instance for pose
+    # reachability pre-checks. The daemon already runs its own IK; this is
+    # a local mirror so we can decide *before* shipping the pose whether
+    # to hold the last reachable one. ~40 us per call on Wireless hardware,
+    # safe at the 100 Hz control rate.
+    engine = getattr(manager, "_ik_safety_engine", None)
+    if engine is None:
+        from reachy_mini.kinematics import AnalyticalKinematics
+        engine = AnalyticalKinematics()
+        manager._ik_safety_engine = engine
+    return engine
+
+
+def _check_pose_reachable(
+    manager: "MovementManager",
+    head_pose: np.ndarray,
+    body_yaw: float,
+) -> bool:
+    # Returns True when AnalyticalKinematics finds a valid joint solution
+    # without collision. NaN in any joint angle means unreachable. We
+    # fail open on internal errors so a broken safety net never blocks
+    # legitimate motion.
+    try:
+        engine = _get_ik_safety_engine(manager)
+        joints = engine.ik(head_pose, body_yaw=body_yaw, check_collision=True)
+        return not bool(np.isnan(joints).any())
+    except Exception:
+        return True
+
+
+def _log_unreachable_throttled(manager: "MovementManager") -> None:
+    # Throttled to 1 Hz like the diagnostic dump so a stuck unreachable
+    # request doesn't flood journald, but persistent issues still surface.
+    now = manager._now()
+    if (now - getattr(manager, "_last_unreachable_log_ts", 0.0)) <= 1.0:
+        return
+    s = manager.state
+    logger.warning(
+        "[POSE_GUARD] Held last reachable head_pose; "
+        "requested primary=(%+.3f,%+.3f,%+.3f|r%+.3f,p%+.3f,y%+.3f) state=%s",
+        s.target_x, s.target_y, s.target_z,
+        s.target_roll, s.target_pitch, s.target_yaw,
+        getattr(s.robot_state, "name", s.robot_state),
+    )
+    manager._last_unreachable_log_ts = now
+
+
 def update_face_tracking(manager: "MovementManager", face_detected_threshold: float) -> None:
     if manager._camera_server is None:
         return
@@ -118,6 +166,15 @@ def compose_final_pose(manager: "MovementManager") -> tuple[np.ndarray, tuple[fl
             step = max(-max_step, min(max_step, delta))
             manager._body_yaw_smoothed = clamp_body_yaw(manager._body_yaw_smoothed + step)
         manager._last_body_yaw_update = now
+
+    body_yaw_for_check = manager._body_yaw_smoothed if manager._body_yaw_smoothed is not None else 0.0
+    if _check_pose_reachable(manager, final_head, body_yaw_for_check):
+        manager._last_reachable_head_pose = final_head.copy()
+    else:
+        last_good = getattr(manager, "_last_reachable_head_pose", None)
+        if last_good is not None:
+            final_head = last_good
+        _log_unreachable_throttled(manager)
 
     return final_head, (antenna_right, antenna_left), manager._body_yaw_smoothed
 
