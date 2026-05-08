@@ -500,38 +500,48 @@ class ReachyController:
             logger.error(f"Error setting body yaw: {e}")
 
     def get_antenna_left(self) -> float:
-        """Get left antenna angle in degrees."""
-        joints = self._get_joint_positions()
-        if joints is None:
+        # Reflect the App-side setpoint, not the live hardware reading. HA's
+        # NumberEntity uses this getter to validate the slider state right
+        # after a NumberCommandRequest; returning the hardware joint
+        # position would snap the slider back to the still-travelling servo
+        # value. The setter writes state.target_antenna_left; the getter
+        # mirrors the same field for HA echo correctness.
+        if self._movement_manager is None:
             return 0.0
-        try:
-            _, antennas = joints
-            return math.degrees(antennas[1])  # left is index 1
-        except Exception as e:
-            logger.error(f"Error getting left antenna: {e}")
-            return 0.0
+        return math.degrees(self._movement_manager.state.target_antenna_left)
 
     def set_antenna_left(self, angle_deg: float) -> None:
         """Set left antenna angle in degrees via MovementManager."""
-        if not self._set_pose_via_manager(antenna_left=math.radians(angle_deg)):
+        if self._movement_manager is None:
             self._disabled_pose_setter("antenna_left")
+            return
+        rad = math.radians(angle_deg)
+        # Sync write so the getter reads the new value in the same tick.
+        # MovementManager.set_target_pose pushes onto an async command
+        # queue that's drained on the next 100 Hz poll; without the sync
+        # write, HA's NumberEntity getter (called immediately after the
+        # setter in NumberEntity.handle_message) would read the stale
+        # state and snap the slider back by one step.
+        self._movement_manager.state.target_antenna_left = rad
+        # Keep the queue path for any side-effects of set_target_pose.
+        self._set_pose_via_manager(antenna_left=rad)
 
     def get_antenna_right(self) -> float:
-        """Get right antenna angle in degrees."""
-        joints = self._get_joint_positions()
-        if joints is None:
+        # See get_antenna_left for rationale; mirror the setter's state
+        # field so HA's slider stays put after a NumberCommandRequest.
+        if self._movement_manager is None:
             return 0.0
-        try:
-            _, antennas = joints
-            return math.degrees(antennas[0])  # right is index 0
-        except Exception as e:
-            logger.error(f"Error getting right antenna: {e}")
-            return 0.0
+        return math.degrees(self._movement_manager.state.target_antenna_right)
 
     def set_antenna_right(self, angle_deg: float) -> None:
         """Set right antenna angle in degrees via MovementManager."""
-        if not self._set_pose_via_manager(antenna_right=math.radians(angle_deg)):
+        if self._movement_manager is None:
             self._disabled_pose_setter("antenna_right")
+            return
+        rad = math.radians(angle_deg)
+        # See set_antenna_left for the sync-write rationale (off-by-one fix).
+        self._movement_manager.state.target_antenna_right = rad
+        self._set_pose_via_manager(antenna_right=rad)
 
     # ========== Phase 4: Look At Control ==========
 
