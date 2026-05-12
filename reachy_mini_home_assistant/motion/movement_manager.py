@@ -203,7 +203,11 @@ class MovementManager:
         self._reconnect_attempt_interval = self._reconnect_backoff_initial
         self._last_reconnect_attempt = 0.0
         self._consecutive_errors = 0
-        self._max_consecutive_errors = 5
+        # One transient set_target failure is enough to enter the reconnect
+        # path. With the old threshold (5) the app kept hammering set_target
+        # at 50 Hz for ~40 ms during a localhost-IPC drop before backing off,
+        # which surfaced to HA as ~1.6 s of "frozen" UI mid-animation.
+        self._max_consecutive_errors = 1
 
         # Pending action
         self._pending_action: PendingAction | None = None

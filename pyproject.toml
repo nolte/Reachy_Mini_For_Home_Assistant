@@ -7,7 +7,7 @@ name = "reachy_mini_home_assistant"
 version = "1.0.7"
 description = "Deep integration of Reachy Mini robot with Home Assistant"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 license = {text = "Apache-2.0"}
 dependencies = [
     # Reachy Mini SDK with gstreamer support (for camera streaming)
@@ -56,7 +56,7 @@ dependencies = [
 keywords = ["reachy-mini-app", "reachy-mini", "home-assistant", "voice-assistant"]
 
 [project.entry-points."reachy_mini_apps"]
-reachy_mini_home_assistant = "reachy_mini_home_assistant.main:ReachyMiniHaVoice"
+reachy_mini_home_assistant = "reachy_mini_home_assistant.main:ReachyMiniHomeAssistant"
 
 [tool.setuptools]
 package-dir = { "" = "." }

@@ -17,7 +17,7 @@ from .voice_assistant import VoiceAssistantService
 logger = logging.getLogger(__name__)
 
 
-class ReachyMiniHaVoice(ReachyMiniApp):
+class ReachyMiniHomeAssistant(ReachyMiniApp):
     """
     Reachy Mini for Home Assistant Application.
 
@@ -38,6 +38,23 @@ class ReachyMiniHaVoice(ReachyMiniApp):
         """
         Override wrapped_run to handle Reachy Mini connection failures.
         """
+        # Persist logs to a file regardless of how the entry-point boots the app.
+        # The Pollen daemon only surfaces stdout/stderr via current-app-status.error
+        # after a crash; for live triage we need an on-disk file we can tail while
+        # the app is still running.
+        try:
+            _fh = logging.FileHandler("/tmp/reachy_mini_home_assistant.log", mode="w")
+            _fh.setFormatter(
+                logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            )
+            root = logging.getLogger()
+            if root.level > logging.INFO or root.level == logging.NOTSET:
+                root.setLevel(logging.INFO)
+            root.addHandler(_fh)
+            logger.info("File logger attached at /tmp/reachy_mini_home_assistant.log")
+        except Exception as _e:
+            logger.warning("Could not attach file logger: %s", _e)
+
         logger.info("Starting Reachy Mini HA Voice App...")
 
         # Connect to ReachyMini
@@ -64,6 +81,26 @@ class ReachyMiniHaVoice(ReachyMiniApp):
             stop_event: Event to signal graceful shutdown
         """
         logger.info("Starting Reachy Mini for Home Assistant...")
+
+        # Eager-load the Hugging Face-backed emotion library before the
+        # asyncio loop starts. Otherwise the first emotion trigger from HA
+        # calls RecordedMoves(...) on the event-loop thread, which does a
+        # synchronous HF download and freezes the entire app.
+        import time
+
+        from .motion.emotion_moves import _ensure_emotion_library_loaded
+
+        preload_start = time.monotonic()
+        if _ensure_emotion_library_loaded():
+            logger.info(
+                "Emotion library ready (preload took %.1fs)",
+                time.monotonic() - preload_start,
+            )
+        else:
+            logger.warning(
+                "Emotion library preload failed after %.1fs; emotions will be unavailable",
+                time.monotonic() - preload_start,
+            )
 
         # Create and run the HA service
         service = VoiceAssistantService(reachy_mini)
@@ -127,13 +164,22 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # Also persist logs to a file so we can read them while the app is running,
+    # not only after it crashes (the Pollen daemon only surfaces stdout/stderr
+    # via current-app-status.error when the app actually dies).
+    _file_handler = logging.FileHandler("/tmp/reachy_mini_home_assistant.log", mode="w")
+    _file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+    logging.getLogger().addHandler(_file_handler)
+
     # Reduce verbosity for some noisy modules
     logging.getLogger("reachy_mini.media.media_manager").setLevel(logging.WARNING)
     logging.getLogger("reachy_mini.media.camera_base").setLevel(logging.WARNING)
     logging.getLogger("reachy_mini.media.audio_base").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-    app = ReachyMiniHaVoice()
+    app = ReachyMiniHomeAssistant()
     try:
         app.wrapped_run()
     except KeyboardInterrupt:
