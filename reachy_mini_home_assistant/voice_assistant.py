@@ -188,6 +188,48 @@ class VoiceAssistantService:
             self._motion.movement_manager.set_idle_behavior_enabled(idle_enabled)
             _LOGGER.info("Idle behavior restored from preferences: %s", idle_enabled)
 
+        # Phase 2 wire-in: instantiate the EmotionPlayer that consumes the
+        # YAML-defined emotion catalog (reachy_mini_home_assistant/emotions/).
+        # See docs/refactor-emotion-pipeline-design.md §6 for the pause/resume
+        # protocol — we reuse the existing _emotion_playing_event flag on the
+        # MovementManager so its control loop skips set_target while the
+        # EmotionPlayer's worker thread owns the SDK.
+        try:
+            from pathlib import Path as _Path
+            from .motion.emotion_loader import load_emotions as _load_emotions
+            from .motion.emotion_player import EmotionPlayer as _EmotionPlayer
+
+            _emotions_dir = _Path(__file__).parent / "emotions"
+            _emotions = _load_emotions(_emotions_dir)
+            _mm = self._motion.movement_manager if self._motion else None
+
+            def _emotion_pause():
+                if _mm is not None:
+                    _mm._emotion_playing_event.set()
+
+            def _emotion_resume():
+                if _mm is not None:
+                    _mm._emotion_playing_event.clear()
+
+            self._motion.emotion_player = _EmotionPlayer(
+                reachy=self.reachy_mini,
+                emotions=_emotions,
+                on_pause=_emotion_pause,
+                on_resume=_emotion_resume,
+            )
+            _LOGGER.info(
+                "EmotionPlayer initialised with %d YAML emotion(s): %s",
+                len(_emotions),
+                sorted(_emotions.keys()),
+            )
+        except Exception as _emotion_init_err:
+            _LOGGER.warning(
+                "Could not initialise EmotionPlayer; YAML emotions will be unavailable: %s",
+                _emotion_init_err,
+            )
+            if self._motion is not None:
+                self._motion.emotion_player = None
+
         # Start Reachy Mini media system
         try:
             media = self.reachy_mini.media

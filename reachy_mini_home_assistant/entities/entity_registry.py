@@ -134,6 +134,20 @@ class EntityRegistry:
             "Dance": "dance1",
             "Electric": "electric1",
             "Dying": "dying1",
+            # YAML-defined emotions (new pipeline, Phase 2 wire-in).
+            # The bare names (without trailing digit) match
+            # reachy_mini_home_assistant/emotions/*.yaml and are dispatched
+            # to EmotionPlayer in motion_bridge.queue_emotion_move.
+            "Happy (v2)": "happy",
+            "Sad (v2)": "sad",
+            "Surprised (v2)": "surprised",
+            "Curious (v2)": "curious",
+            "Acknowledge": "acknowledge",
+            "Error": "error",
+            "Idle (v2)": "idle",
+            "Listening (v2)": "listening",
+            "Thinking (v2)": "thinking",
+            "Speaking (v2)": "speaking",
         }
 
     def _get_preferences(self) -> Preferences | None:
