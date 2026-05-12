@@ -50,8 +50,8 @@
                             "x_m":  -0.021,
                             "y_m":  0.001,
                             "z_m":  -0.044,
-                            "antenna_left_rad":  2.5,
-                            "antenna_right_rad":  -2.5
+                            "antenna_left_rad":  2.8,
+                            "antenna_right_rad":  -2.8
                         },
     "emotions":  {
                      "happy":  {
