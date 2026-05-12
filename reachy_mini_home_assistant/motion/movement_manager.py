@@ -209,6 +209,20 @@ class MovementManager:
         # which surfaced to HA as ~1.6 s of "frozen" UI mid-animation.
         self._max_consecutive_errors = 1
 
+        # Lead-in interpolation for emotion moves: when an emotion starts from
+        # an idle_rest_pose far from the animation's evaluate(0) values (e.g.
+        # antennas at ±160° rest, emotion wants ±30°), the first set_target
+        # tick would be a >100° jump that the daemon IPC cannot absorb. The
+        # lead-in interpolates pre-emotion → evaluate(0) over a short window.
+        self._emotion_lead_in_duration_s = 0.5
+        self._pre_emotion_head_pose = None
+        self._pre_emotion_antennas: tuple[float, float] = (0.0, 0.0)
+        self._pre_emotion_body_yaw: float = 0.0
+        # Playback-speed multiplier on RecordedMove.evaluate(t). Values < 1.0
+        # slow the animation down (gentler motion, less servo-stress). 0.5
+        # halves the speed.
+        self._emotion_playback_speed = 0.5
+
         # Pending action
         self._pending_action: PendingAction | None = None
         self._action_start_time: float = 0.0
@@ -751,6 +765,15 @@ class MovementManager:
                 self.robot.set_automatic_body_yaw(False)
             except Exception as auto_yaw_err:
                 logger.debug("Could not disable automatic body yaw: %s", auto_yaw_err)
+            # Capture the last actually-sent pose so update_emotion_move can
+            # interpolate smoothly from here to evaluate(0). Without this, a
+            # rest pose like ±2.8 rad antennas would force a >100° jump in
+            # the first set_target tick of every emotion and stall the IPC.
+            self._pre_emotion_head_pose = (
+                self._last_sent_head_pose.copy() if self._last_sent_head_pose is not None else None
+            )
+            self._pre_emotion_antennas = self._last_sent_antennas if self._last_sent_antennas is not None else (0.0, 0.0)
+            self._pre_emotion_body_yaw = self._last_sent_body_yaw if self._last_sent_body_yaw is not None else 0.0
             with self._emotion_move_lock:
                 self._emotion_move = emotion_move
                 self._emotion_start_time = self._now()
