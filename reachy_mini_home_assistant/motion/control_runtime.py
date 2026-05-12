@@ -118,19 +118,17 @@ def update_emotion_move(manager: "MovementManager") -> tuple[np.ndarray, tuple[f
 
         try:
             if elapsed < lead_in and lead_in > 0:
-                # Lead-in phase: interpolate from the last actually-sent pose
-                # to the animation's evaluate(0) values. This prevents a hard
-                # set_target jump when idle_rest_pose is far from the
-                # animation's start (e.g. antennas at ±160° rest, emotion's
-                # evaluate(0) wants ±30° — without lead-in that's a >100°
-                # jump in the first tick which stalls the IPC).
+                # Lead-in phase: interpolate ONLY the scalar joints — antennas
+                # and body_yaw — from the pre-emotion pose toward the
+                # animation's evaluate(0) values. The 4x4 head_pose matrix is
+                # NOT interpolated, because component-wise linear interpolation
+                # of rotation matrices produces non-orthonormal output that
+                # the SDK rejects. Instead we hand evaluate(0)'s head matrix
+                # straight through; the head joints' own smoothing absorbs
+                # the resulting small step.
                 progress = elapsed / lead_in
-                start_head, start_ant, start_by = manager._emotion_move.evaluate(0.0)
-                pre_head = manager._pre_emotion_head_pose
-                if pre_head is not None:
-                    head_pose = pre_head * (1.0 - progress) + start_head * progress
-                else:
-                    head_pose = start_head
+                _, start_ant, start_by = manager._emotion_move.evaluate(0.0)
+                head_pose, _, _ = manager._emotion_move.evaluate(0.0)
                 pre_a_r, pre_a_l = manager._pre_emotion_antennas
                 ant_r = pre_a_r * (1.0 - progress) + float(start_ant[0]) * progress
                 ant_l = pre_a_l * (1.0 - progress) + float(start_ant[1]) * progress
