@@ -1,0 +1,24 @@
+# Alert posture, gentle wiggle. Triggered when wake word is detected.
+name: listening
+description: Alert posture with antennas raised and a gentle wiggle
+type: continuous
+loops: true
+static_offset:
+  z_mm: 3
+  pitch_deg: -3
+  antenna_left_deg: 20
+  antenna_right_deg: -20
+oscillators:
+  - field: z_mm
+    amplitude: 1
+    frequency_hz: 0.6
+  - field: pitch_deg
+    amplitude: 1
+    frequency_hz: 0.6
+  - field: antenna_left_deg
+    amplitude: 8
+    frequency_hz: 0.6
+  - field: antenna_right_deg
+    amplitude: 8
+    frequency_hz: 0.6
+    phase_offset_rad: 3.14159265   # π = anti-phase with antenna_left

@@ -1,0 +1,19 @@
+# Slow breathing motion (4 s per cycle) — continuous, loops forever.
+# Identical to reference-app waiting-idle at BREATH_FREQ = 0.25 Hz.
+name: idle
+description: Slow breathing motion when nothing else is happening
+type: continuous
+loops: true
+oscillators:
+  - field: z_mm
+    amplitude: 2
+    frequency_hz: 0.25
+  - field: pitch_deg
+    amplitude: 1
+    frequency_hz: 0.25
+  - field: antenna_left_deg
+    amplitude: 2
+    frequency_hz: 0.25
+  - field: antenna_right_deg
+    amplitude: 2
+    frequency_hz: 0.25

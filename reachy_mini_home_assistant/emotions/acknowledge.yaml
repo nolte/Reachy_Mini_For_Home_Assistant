@@ -1,0 +1,21 @@
+# Single quick nod, for "command received". ~1 s total.
+name: acknowledge
+description: Single quick nod ("got it")
+type: one_shot
+phases:
+  - name: down
+    duration_s: 0.25
+    easing: min_jerk
+    end:
+      z_mm: -3
+      pitch_deg: -10
+  - name: up
+    duration_s: 0.25
+    easing: min_jerk
+    end:
+      z_mm: 2
+      pitch_deg: 3
+  - name: home
+    duration_s: 0.50
+    easing: min_jerk
+    end: {}
