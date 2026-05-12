@@ -21,6 +21,7 @@ Invariants:
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from typing import Callable, Dict, Optional
@@ -41,6 +42,17 @@ LEAD_IN_S = 0.5            # smooth pre-emotion → first animation pose
 EASE_OUT_S = 0.5           # smooth animation tail → rest pose
 TICK_S = 0.02              # 50 Hz, same as reference app
 PLAYBACK_SPEED = 0.5       # 0.5× = half speed; operator-confirmed default
+
+# Rate-limit / change-detect: don't push set_target faster than the
+# hardware can actually move. The Pollen WSClient pipeline silently
+# buffers commands when the daemon queue saturates (see today's
+# investigation in PR #4's review). Skipping no-op ticks reduces the
+# load enough that the saturation pattern stops triggering.
+SET_TARGET_DELTA_M = 0.0005             # 0.5 mm — below encoder noise
+SET_TARGET_DELTA_RAD = math.radians(0.5)  # 0.5° — below encoder noise
+SET_TARGET_HEARTBEAT_S = 0.2            # send at least once every 200 ms
+                                         # (5 Hz floor; keeps SDK side
+                                         # convinced the connection is live)
 
 
 class EmotionPlayer:
@@ -86,6 +98,12 @@ class EmotionPlayer:
         self._worker: Optional[threading.Thread] = None
         self._cancel_event = threading.Event()
         self._current_emotion_name: Optional[str] = None
+
+        # Rate-limit state. Worker resets these on entry so each emotion
+        # starts with a fresh delta accounting.
+        self._last_sent_pose: Optional[EmotionPose] = None
+        self._last_sent_ts: float = 0.0
+        self._skipped_ticks_in_a_row: int = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -155,6 +173,12 @@ class EmotionPlayer:
     def _worker_main(self, emotion_name: str) -> None:
         """Owns reachy.set_target for the duration of this emotion."""
         emotion = self._emotions[emotion_name]
+        # Reset rate-limit state so the first tick of each new emotion
+        # always sends (no stale last_sent_pose from a previous emotion
+        # that might be within delta of the new lead-in start).
+        self._last_sent_pose = None
+        self._last_sent_ts = 0.0
+        self._skipped_ticks_in_a_row = 0
         logger.info("Started emotion %r", emotion_name)
         try:
             if self._on_pause is not None:
@@ -291,9 +315,63 @@ class EmotionPlayer:
     # ------------------------------------------------------------------
 
     def _apply(self, pose: EmotionPose) -> None:
-        """Push one pose to the SDK."""
+        """Push one pose to the SDK, but rate-limit no-op updates.
+
+        Skips the set_target call when the new pose is within the
+        encoder-noise threshold of the last sent pose, unless the
+        last send was more than SET_TARGET_HEARTBEAT_S ago.
+
+        This is the workaround for the Pollen WSClient saturation
+        bug: at 50 Hz blind sending, the daemon's command queue
+        eventually saturates and silently drops follow-up commands.
+        By only sending when the pose actually moved, we let the
+        daemon catch up and avoid the silent stall.
+        """
+        if self._pose_unchanged(pose):
+            self._skipped_ticks_in_a_row += 1
+            return
+
+        if self._skipped_ticks_in_a_row > 0:
+            logger.debug(
+                "EmotionPlayer: skipped %d static ticks before next set_target",
+                self._skipped_ticks_in_a_row,
+            )
+            self._skipped_ticks_in_a_row = 0
+
         head, antennas, body_yaw = to_set_target(pose)
         self._reachy.set_target(head=head, antennas=antennas, body_yaw=body_yaw)
+        self._last_sent_pose = pose
+        self._last_sent_ts = time.monotonic()
+
+    def _pose_unchanged(self, pose: EmotionPose) -> bool:
+        """True iff `pose` is within delta thresholds of the last sent pose
+        AND the heartbeat-interval has not yet elapsed since the last send."""
+        if self._last_sent_pose is None:
+            return False
+        if time.monotonic() - self._last_sent_ts >= SET_TARGET_HEARTBEAT_S:
+            return False
+        prev = self._last_sent_pose
+        # Translation deltas (metres)
+        if abs(pose.x - prev.x) > SET_TARGET_DELTA_M:
+            return False
+        if abs(pose.y - prev.y) > SET_TARGET_DELTA_M:
+            return False
+        if abs(pose.z - prev.z) > SET_TARGET_DELTA_M:
+            return False
+        # Angular deltas (radians)
+        if abs(pose.roll - prev.roll) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.pitch - prev.pitch) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.yaw - prev.yaw) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.antenna_left - prev.antenna_left) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.antenna_right - prev.antenna_right) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.body_yaw - prev.body_yaw) > SET_TARGET_DELTA_RAD:
+            return False
+        return True
 
     def _read_present_pose_safe(self) -> EmotionPose:
         """Read the real current pose from the SDK; falls back to NEUTRAL
