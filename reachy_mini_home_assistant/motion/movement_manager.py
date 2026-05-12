@@ -740,6 +740,17 @@ class MovementManager:
 
         try:
             emotion_move = EmotionMove(emotion_name)
+            # Disable the SDK's automatic body-yaw tracker while we drive the
+            # body_yaw ourselves from the emotion's evaluate() output. With the
+            # auto-tracker active and the app pushing a separate body_yaw
+            # setpoint at 50 Hz, the two compete for the same servo, which
+            # under load shows up as silent IPC stalls (notably "enthusiastic1",
+            # whose body_yaw is a constant +9.27° for the whole animation).
+            # Re-enabled in update_emotion_move() when the move completes.
+            try:
+                self.robot.set_automatic_body_yaw(False)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not disable automatic body yaw: %s", auto_yaw_err)
             with self._emotion_move_lock:
                 self._emotion_move = emotion_move
                 self._emotion_start_time = self._now()

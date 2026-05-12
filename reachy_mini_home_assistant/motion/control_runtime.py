@@ -100,6 +100,11 @@ def update_emotion_move(manager: "MovementManager") -> tuple[np.ndarray, tuple[f
             emotion_name = manager._emotion_move.emotion_name
             manager._emotion_move = None
             logger.info("Emotion move complete: %s", emotion_name)
+            # Re-enable SDK auto body-yaw — we disabled it in _start_emotion_move
+            try:
+                manager.robot.set_automatic_body_yaw(True)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not re-enable automatic body yaw: %s", auto_yaw_err)
             return None
         try:
             head_pose, antennas, body_yaw = manager._emotion_move.evaluate(elapsed)
@@ -109,6 +114,12 @@ def update_emotion_move(manager: "MovementManager") -> tuple[np.ndarray, tuple[f
         except Exception as e:
             logger.error("Error sampling emotion pose: %s", e)
             manager._emotion_move = None
+            # Re-enable auto body-yaw on failure path too, to avoid leaving the
+            # SDK with auto-tracking permanently disabled.
+            try:
+                manager.robot.set_automatic_body_yaw(True)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not re-enable automatic body yaw: %s", auto_yaw_err)
             return None
 
 
