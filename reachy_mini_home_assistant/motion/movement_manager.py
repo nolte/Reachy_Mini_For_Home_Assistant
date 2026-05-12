@@ -765,14 +765,26 @@ class MovementManager:
                 self.robot.set_automatic_body_yaw(False)
             except Exception as auto_yaw_err:
                 logger.debug("Could not disable automatic body yaw: %s", auto_yaw_err)
-            # Capture the last actually-sent pose so update_emotion_move can
-            # interpolate smoothly from here to evaluate(0). Without this, a
-            # rest pose like ±2.8 rad antennas would force a >100° jump in
-            # the first set_target tick of every emotion and stall the IPC.
-            self._pre_emotion_head_pose = (
-                self._last_sent_head_pose.copy() if self._last_sent_head_pose is not None else None
-            )
-            self._pre_emotion_antennas = self._last_sent_antennas if self._last_sent_antennas is not None else (0.0, 0.0)
+            # Capture the REAL hardware position (not the last setpoint) so
+            # update_emotion_move can interpolate smoothly to evaluate(0).
+            # Using _last_sent_antennas would drift from reality whenever
+            # the servos couldn't reach the previous setpoint (e.g. after
+            # multi-turn-counter drift), and the lead-in would then implicitly
+            # ask the servo for a >180° path that comes out as a 360° spin.
+            try:
+                self._pre_emotion_head_pose = self.robot.get_current_head_pose()
+            except Exception as head_err:
+                logger.debug("Could not read present head pose: %s", head_err)
+                self._pre_emotion_head_pose = (
+                    self._last_sent_head_pose.copy() if self._last_sent_head_pose is not None else None
+                )
+            try:
+                present_ant = self.robot.get_present_antenna_joint_positions()
+                # SDK convention is [right, left] in radians
+                self._pre_emotion_antennas = (float(present_ant[0]), float(present_ant[1]))
+            except Exception as ant_err:
+                logger.debug("Could not read present antennas: %s", ant_err)
+                self._pre_emotion_antennas = self._last_sent_antennas if self._last_sent_antennas is not None else (0.0, 0.0)
             self._pre_emotion_body_yaw = self._last_sent_body_yaw if self._last_sent_body_yaw is not None else 0.0
             with self._emotion_move_lock:
                 self._emotion_move = emotion_move
