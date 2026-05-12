@@ -992,6 +992,18 @@ class MovementManager:
 
         self._stop_event.clear()
 
+        # Enable motors first — the Pollen daemon resets motors to disabled
+        # on every restart for safety, and our app never used to call
+        # enable_motors() at boot. That meant set_target calls reached the
+        # daemon but the servos ignored them, so the antennas hung in their
+        # gravity-rest position (~±174°) and emotion animations had no
+        # visible effect on the hardware.
+        try:
+            self.robot.enable_motors()
+            logger.info("Motors enabled on startup")
+        except Exception as motor_err:
+            logger.warning("Could not enable motors on startup: %s", motor_err)
+
         # Reset to neutral position first (handles restart after crash/disconnect)
         # This ensures head returns to center on app startup
         self.reset_to_neutral(duration=0.5)
