@@ -22,7 +22,7 @@ except Exception:
 __author__ = "Desmond Dong"
 
 # Don't import main module here to avoid runpy warning
-# The app is loaded via entry point: reachy_mini_home_assistant.main:ReachyMiniHaVoiceApp
+# The app is loaded via entry point: reachy_mini_home_assistant.main:ReachyMiniHomeAssistant
 
 __all__ = [
     "__version__",

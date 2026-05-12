@@ -95,20 +95,61 @@ def update_emotion_move(manager: "MovementManager") -> tuple[np.ndarray, tuple[f
     with manager._emotion_move_lock:
         if manager._emotion_move is None:
             return None
+
         elapsed = manager._now() - manager._emotion_start_time
-        if elapsed >= manager._emotion_move.duration:
+        lead_in = getattr(manager, "_emotion_lead_in_duration_s", 0.0)
+        speed = getattr(manager, "_emotion_playback_speed", 1.0)
+        if speed <= 0.0:
+            speed = 1.0
+
+        # Total wall-clock duration = lead_in + (animation_duration / speed)
+        anim_duration = manager._emotion_move.duration
+        total_wall_time = lead_in + anim_duration / speed
+
+        if elapsed >= total_wall_time:
             emotion_name = manager._emotion_move.emotion_name
             manager._emotion_move = None
             logger.info("Emotion move complete: %s", emotion_name)
+            try:
+                manager.robot.set_automatic_body_yaw(True)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not re-enable automatic body yaw: %s", auto_yaw_err)
             return None
+
         try:
-            head_pose, antennas, body_yaw = manager._emotion_move.evaluate(elapsed)
+            if elapsed < lead_in and lead_in > 0:
+                # Lead-in phase: interpolate ONLY the scalar joints — antennas
+                # and body_yaw — from the pre-emotion pose toward the
+                # animation's evaluate(0) values. The 4x4 head_pose matrix is
+                # NOT interpolated, because component-wise linear interpolation
+                # of rotation matrices produces non-orthonormal output that
+                # the SDK rejects. Instead we hand evaluate(0)'s head matrix
+                # straight through; the head joints' own smoothing absorbs
+                # the resulting small step.
+                progress = elapsed / lead_in
+                _, start_ant, start_by = manager._emotion_move.evaluate(0.0)
+                head_pose, _, _ = manager._emotion_move.evaluate(0.0)
+                pre_a_r, pre_a_l = manager._pre_emotion_antennas
+                ant_r = pre_a_r * (1.0 - progress) + float(start_ant[0]) * progress
+                ant_l = pre_a_l * (1.0 - progress) + float(start_ant[1]) * progress
+                by_blend = manager._pre_emotion_body_yaw * (1.0 - progress) + float(start_by) * progress
+                return (head_pose, (ant_r, ant_l), clamp_body_yaw(by_blend))
+
+            # Regular animation, scaled by playback speed.
+            t = (elapsed - lead_in) * speed
+            if t >= anim_duration:
+                t = anim_duration - 1e-3
+            head_pose, antennas, body_yaw = manager._emotion_move.evaluate(t)
             antenna_tuple = (float(antennas[0]), float(antennas[1]))
             clamped_body_yaw = clamp_body_yaw(float(body_yaw))
             return (head_pose, antenna_tuple, clamped_body_yaw)
         except Exception as e:
             logger.error("Error sampling emotion pose: %s", e)
             manager._emotion_move = None
+            try:
+                manager.robot.set_automatic_body_yaw(True)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not re-enable automatic body yaw: %s", auto_yaw_err)
             return None
 
 

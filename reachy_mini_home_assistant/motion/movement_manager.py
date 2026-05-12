@@ -203,7 +203,25 @@ class MovementManager:
         self._reconnect_attempt_interval = self._reconnect_backoff_initial
         self._last_reconnect_attempt = 0.0
         self._consecutive_errors = 0
-        self._max_consecutive_errors = 5
+        # One transient set_target failure is enough to enter the reconnect
+        # path. With the old threshold (5) the app kept hammering set_target
+        # at 50 Hz for ~40 ms during a localhost-IPC drop before backing off,
+        # which surfaced to HA as ~1.6 s of "frozen" UI mid-animation.
+        self._max_consecutive_errors = 1
+
+        # Lead-in interpolation for emotion moves: when an emotion starts from
+        # an idle_rest_pose far from the animation's evaluate(0) values (e.g.
+        # antennas at ±160° rest, emotion wants ±30°), the first set_target
+        # tick would be a >100° jump that the daemon IPC cannot absorb. The
+        # lead-in interpolates pre-emotion → evaluate(0) over a short window.
+        self._emotion_lead_in_duration_s = 0.5
+        self._pre_emotion_head_pose = None
+        self._pre_emotion_antennas: tuple[float, float] = (0.0, 0.0)
+        self._pre_emotion_body_yaw: float = 0.0
+        # Playback-speed multiplier on RecordedMove.evaluate(t). Values < 1.0
+        # slow the animation down (gentler motion, less servo-stress). 0.5
+        # halves the speed.
+        self._emotion_playback_speed = 0.5
 
         # Pending action
         self._pending_action: PendingAction | None = None
@@ -736,6 +754,38 @@ class MovementManager:
 
         try:
             emotion_move = EmotionMove(emotion_name)
+            # Disable the SDK's automatic body-yaw tracker while we drive the
+            # body_yaw ourselves from the emotion's evaluate() output. With the
+            # auto-tracker active and the app pushing a separate body_yaw
+            # setpoint at 50 Hz, the two compete for the same servo, which
+            # under load shows up as silent IPC stalls (notably "enthusiastic1",
+            # whose body_yaw is a constant +9.27° for the whole animation).
+            # Re-enabled in update_emotion_move() when the move completes.
+            try:
+                self.robot.set_automatic_body_yaw(False)
+            except Exception as auto_yaw_err:
+                logger.debug("Could not disable automatic body yaw: %s", auto_yaw_err)
+            # Capture the REAL hardware position (not the last setpoint) so
+            # update_emotion_move can interpolate smoothly to evaluate(0).
+            # Using _last_sent_antennas would drift from reality whenever
+            # the servos couldn't reach the previous setpoint (e.g. after
+            # multi-turn-counter drift), and the lead-in would then implicitly
+            # ask the servo for a >180° path that comes out as a 360° spin.
+            try:
+                self._pre_emotion_head_pose = self.robot.get_current_head_pose()
+            except Exception as head_err:
+                logger.debug("Could not read present head pose: %s", head_err)
+                self._pre_emotion_head_pose = (
+                    self._last_sent_head_pose.copy() if self._last_sent_head_pose is not None else None
+                )
+            try:
+                present_ant = self.robot.get_present_antenna_joint_positions()
+                # SDK convention is [right, left] in radians
+                self._pre_emotion_antennas = (float(present_ant[0]), float(present_ant[1]))
+            except Exception as ant_err:
+                logger.debug("Could not read present antennas: %s", ant_err)
+                self._pre_emotion_antennas = self._last_sent_antennas if self._last_sent_antennas is not None else (0.0, 0.0)
+            self._pre_emotion_body_yaw = self._last_sent_body_yaw if self._last_sent_body_yaw is not None else 0.0
             with self._emotion_move_lock:
                 self._emotion_move = emotion_move
                 self._emotion_start_time = self._now()
@@ -976,6 +1026,18 @@ class MovementManager:
             return
 
         self._stop_event.clear()
+
+        # Enable motors first — the Pollen daemon resets motors to disabled
+        # on every restart for safety, and our app never used to call
+        # enable_motors() at boot. That meant set_target calls reached the
+        # daemon but the servos ignored them, so the antennas hung in their
+        # gravity-rest position (~±174°) and emotion animations had no
+        # visible effect on the hardware.
+        try:
+            self.robot.enable_motors()
+            logger.info("Motors enabled on startup")
+        except Exception as motor_err:
+            logger.warning("Could not enable motors on startup: %s", motor_err)
 
         # Reset to neutral position first (handles restart after crash/disconnect)
         # This ensures head returns to center on app startup
