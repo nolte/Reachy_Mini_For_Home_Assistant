@@ -195,6 +195,9 @@ class EmotionPlayer:
         self._reachy = reachy
         self._mm = movement_manager
         self._idle_rest = idle_rest_pose_provider  # callable -> EmotionPose
+        # NOTE: an idle_rest_pose with antennas at exactly 0° triggers a
+        # ±0.5° servo-deadband wobble on the real hardware — see
+        # docs/emotion-catalog.md §1.1. Prefer non-zero antenna setpoints.
         self._lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._cancel_event = threading.Event()

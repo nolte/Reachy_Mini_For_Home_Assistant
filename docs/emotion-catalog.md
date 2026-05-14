@@ -26,6 +26,26 @@ The `RecordedMoves` library stays available as an opt-in extra. The hand-authore
 
 Antenna convention: positive value of *both* antennas means "both tilted in the same nominal direction". The operator's preferred rest pose for the app is `±60°` (antennas mildly tilted down without crowding the end stop — see commit history `b46283e`–`5cfe660` for the tuning exploration).
 
+### 1.1 Hardware caveat — antenna deadband around 0°
+
+Both Reachy Mini antenna servos exhibit a **±0.5° peak-to-peak micro-oscillation** when their setpoint lands inside a small deadband region around `0°` — most likely caused by mechanical play in the antenna shaft that the servo-hold loop fights against indefinitely. The deadband is **per-antenna and asymmetric in sign**:
+
+| Setpoint a[0] / a[1] | a[0] (`antenna_right`) | a[1] (`antenna_left`) |
+|---|---|---|
+| `0° / 0°`     | wobble ~1° peak-to-peak | stable |
+| `0° / +10°`   | wobble ~1° peak-to-peak | stable |
+| `+10° / -10°` | stable (stdev=0.000°)   | wobble ~0.5° peak-to-peak |
+| `+15° / +15°` | **stable**              | **stable** |
+
+(Verified empirically on 2026-05-14 on a wireless unit at firmware 1.7.1; see `.audits/on-device/2026-05-14T21-10Z-smoke_emotion_player.log` and the memory entry `antenna_servo_zero_wobble.md`.)
+
+**Authoring consequence**: when authoring a phase or rest pose, avoid setting antennas to **exactly `0°`**. Even a small offset (`±5°` to `±15°`) is enough to escape the deadband. The catalog's recommended rest pose of `±60°` already satisfies this, but the default `EmotionPlayer` rest pose is `NEUTRAL` (= all zeros), so any code path that eases out to `NEUTRAL` will trigger the wobble on at least one antenna. Two acceptable mitigations:
+
+1. **Configure the rest-pose provider** so the antennas land at `±60°` (catalog) or another non-zero pose; the wobble disappears for free.
+2. **Detect-and-nudge in `_apply`**: if both antenna targets are within `±0.1°` of zero, perturb them by `±1°` in opposite directions. Cheap and invisible.
+
+This is not a fault — it's a property of the servo + linkage. Document it here so future authors don't waste time chasing a "code bug".
+
 Easing types reuse `reachy_mini.utils.interpolation.InterpolationTechnique`:
 
 - **MIN_JERK** — default; smooth start, smooth end. Used for most natural movements.

@@ -21,22 +21,18 @@ from typing import Callable, Dict, List, Union
 import yaml
 from reachy_mini.utils.interpolation import InterpolationTechnique
 
-from .emotion_pose import EmotionPose, Phase
+from .emotion_pose import (
+    MAX_ANTENNA_RAD,
+    MAX_BODY_YAW_RAD,
+    MAX_PITCH_RAD,
+    MAX_ROLL_RAD,
+    MAX_TRANSLATION_M,
+    MAX_YAW_RAD,
+    EmotionPose,
+    Phase,
+)
 
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
-# Safe envelope (catalog.md §1). Out-of-envelope values refuse to load.
-# Values in SDK-native units (m, rad).
-# -----------------------------------------------------------------------------
-
-MAX_TRANSLATION_M = 0.010          # 10 mm
-MAX_PITCH_RAD = math.radians(25)
-MAX_YAW_RAD = math.radians(30)
-MAX_ROLL_RAD = math.radians(20)
-MAX_ANTENNA_RAD = math.radians(90)
-MAX_BODY_YAW_RAD = math.radians(20)
 
 
 # -----------------------------------------------------------------------------
@@ -116,15 +112,15 @@ class EmotionConfigError(ValueError):
 
 # (yaml_field, dataclass_field, conversion_callable)
 _POSE_FIELD_MAP: List[tuple] = [
-    ("x_mm",                "x",              lambda v: v / 1000.0),
-    ("y_mm",                "y",              lambda v: v / 1000.0),
-    ("z_mm",                "z",              lambda v: v / 1000.0),
-    ("roll_deg",            "roll",           math.radians),
-    ("pitch_deg",           "pitch",          math.radians),
-    ("yaw_deg",             "yaw",            math.radians),
-    ("antenna_left_deg",    "antenna_left",   math.radians),
-    ("antenna_right_deg",   "antenna_right",  math.radians),
-    ("body_yaw_deg",        "body_yaw",       math.radians),
+    ("x_mm", "x", lambda v: v / 1000.0),
+    ("y_mm", "y", lambda v: v / 1000.0),
+    ("z_mm", "z", lambda v: v / 1000.0),
+    ("roll_deg", "roll", math.radians),
+    ("pitch_deg", "pitch", math.radians),
+    ("yaw_deg", "yaw", math.radians),
+    ("antenna_left_deg", "antenna_left", math.radians),
+    ("antenna_right_deg", "antenna_right", math.radians),
+    ("body_yaw_deg", "body_yaw", math.radians),
 ]
 
 
@@ -133,16 +129,13 @@ def _parse_pose(yaml_pose: dict, *, path: Path, where: str) -> EmotionPose:
     if yaml_pose is None:
         yaml_pose = {}
     if not isinstance(yaml_pose, dict):
-        raise EmotionConfigError(
-            f"{path}:{where}: pose block must be a mapping, got {type(yaml_pose).__name__}"
-        )
+        raise EmotionConfigError(f"{path}:{where}: pose block must be a mapping, got {type(yaml_pose).__name__}")
 
     kwargs: Dict[str, float] = {}
     unknown = set(yaml_pose.keys()) - {f[0] for f in _POSE_FIELD_MAP}
     if unknown:
         raise EmotionConfigError(
-            f"{path}:{where}: unknown pose field(s): {sorted(unknown)}; "
-            f"valid: {sorted(f[0] for f in _POSE_FIELD_MAP)}"
+            f"{path}:{where}: unknown pose field(s): {sorted(unknown)}; valid: {sorted(f[0] for f in _POSE_FIELD_MAP)}"
         )
 
     for yaml_key, py_key, conv in _POSE_FIELD_MAP:
@@ -158,11 +151,11 @@ def _check_safe_envelope(pose: EmotionPose, *, path: Path, where: str) -> None:
     """Refuse poses outside the documented safe envelope (catalog.md §1)."""
     violations = []
     if abs(pose.x) > MAX_TRANSLATION_M:
-        violations.append(f"x={pose.x*1000:.1f}mm > ±{MAX_TRANSLATION_M*1000:.0f}mm")
+        violations.append(f"x={pose.x * 1000:.1f}mm > ±{MAX_TRANSLATION_M * 1000:.0f}mm")
     if abs(pose.y) > MAX_TRANSLATION_M:
-        violations.append(f"y={pose.y*1000:.1f}mm > ±{MAX_TRANSLATION_M*1000:.0f}mm")
+        violations.append(f"y={pose.y * 1000:.1f}mm > ±{MAX_TRANSLATION_M * 1000:.0f}mm")
     if abs(pose.z) > MAX_TRANSLATION_M:
-        violations.append(f"z={pose.z*1000:.1f}mm > ±{MAX_TRANSLATION_M*1000:.0f}mm")
+        violations.append(f"z={pose.z * 1000:.1f}mm > ±{MAX_TRANSLATION_M * 1000:.0f}mm")
     if abs(pose.pitch) > MAX_PITCH_RAD:
         violations.append(f"pitch={math.degrees(pose.pitch):.1f}° > ±{math.degrees(MAX_PITCH_RAD):.0f}°")
     if abs(pose.yaw) > MAX_YAW_RAD:
@@ -170,16 +163,18 @@ def _check_safe_envelope(pose: EmotionPose, *, path: Path, where: str) -> None:
     if abs(pose.roll) > MAX_ROLL_RAD:
         violations.append(f"roll={math.degrees(pose.roll):.1f}° > ±{math.degrees(MAX_ROLL_RAD):.0f}°")
     if abs(pose.antenna_left) > MAX_ANTENNA_RAD:
-        violations.append(f"antenna_left={math.degrees(pose.antenna_left):.1f}° > ±{math.degrees(MAX_ANTENNA_RAD):.0f}°")
+        violations.append(
+            f"antenna_left={math.degrees(pose.antenna_left):.1f}° > ±{math.degrees(MAX_ANTENNA_RAD):.0f}°"
+        )
     if abs(pose.antenna_right) > MAX_ANTENNA_RAD:
-        violations.append(f"antenna_right={math.degrees(pose.antenna_right):.1f}° > ±{math.degrees(MAX_ANTENNA_RAD):.0f}°")
+        violations.append(
+            f"antenna_right={math.degrees(pose.antenna_right):.1f}° > ±{math.degrees(MAX_ANTENNA_RAD):.0f}°"
+        )
     if abs(pose.body_yaw) > MAX_BODY_YAW_RAD:
         violations.append(f"body_yaw={math.degrees(pose.body_yaw):.1f}° > ±{math.degrees(MAX_BODY_YAW_RAD):.0f}°")
 
     if violations:
-        raise EmotionConfigError(
-            f"{path}:{where}: pose value(s) outside safe envelope: " + "; ".join(violations)
-        )
+        raise EmotionConfigError(f"{path}:{where}: pose value(s) outside safe envelope: " + "; ".join(violations))
 
 
 # -----------------------------------------------------------------------------
@@ -199,15 +194,12 @@ def _parse_one_shot(data: dict, path: Path) -> OneShotEmotion:
 
         duration_s = phase_raw.get("duration_s")
         if duration_s is None or not isinstance(duration_s, (int, float)) or duration_s <= 0:
-            raise EmotionConfigError(
-                f"{path}: phases[{i}].duration_s must be a positive number, got {duration_s!r}"
-            )
+            raise EmotionConfigError(f"{path}: phases[{i}].duration_s must be a positive number, got {duration_s!r}")
 
         easing_name = phase_raw.get("easing", "min_jerk")
         if easing_name not in _EASING_MAP:
             raise EmotionConfigError(
-                f"{path}: phases[{i}].easing must be one of {sorted(_EASING_MAP.keys())}, "
-                f"got {easing_name!r}"
+                f"{path}: phases[{i}].easing must be one of {sorted(_EASING_MAP.keys())}, got {easing_name!r}"
             )
 
         end_pose = _parse_pose(
@@ -216,9 +208,7 @@ def _parse_one_shot(data: dict, path: Path) -> OneShotEmotion:
             where=f"phases[{i}].end",
         )
 
-        phases.append(
-            Phase(end=end_pose, duration_s=float(duration_s), easing=_EASING_MAP[easing_name])
-        )
+        phases.append(Phase(end=end_pose, duration_s=float(duration_s), easing=_EASING_MAP[easing_name]))
 
     return OneShotEmotion(
         name=data["name"],
@@ -252,23 +242,18 @@ def _parse_continuous(data: dict, path: Path) -> ContinuousEmotion:
         field_name = osc.get("field")
         if field_name not in yaml_to_py:
             raise EmotionConfigError(
-                f"{path}: oscillators[{i}].field must be one of {sorted(yaml_to_py.keys())}, "
-                f"got {field_name!r}"
+                f"{path}: oscillators[{i}].field must be one of {sorted(yaml_to_py.keys())}, got {field_name!r}"
             )
 
         py_field, conv = yaml_to_py[field_name]
 
         amplitude_raw = osc.get("amplitude")
         if amplitude_raw is None or not isinstance(amplitude_raw, (int, float)):
-            raise EmotionConfigError(
-                f"{path}: oscillators[{i}].amplitude must be a number, got {amplitude_raw!r}"
-            )
+            raise EmotionConfigError(f"{path}: oscillators[{i}].amplitude must be a number, got {amplitude_raw!r}")
 
         frequency_hz = osc.get("frequency_hz")
         if frequency_hz is None or not isinstance(frequency_hz, (int, float)) or frequency_hz <= 0:
-            raise EmotionConfigError(
-                f"{path}: oscillators[{i}].frequency_hz must be a positive number"
-            )
+            raise EmotionConfigError(f"{path}: oscillators[{i}].frequency_hz must be a positive number")
 
         phase_offset_rad = float(osc.get("phase_offset_rad", 0.0))
 
@@ -281,6 +266,8 @@ def _parse_continuous(data: dict, path: Path) -> ContinuousEmotion:
             )
         )
 
+    _check_oscillator_worst_case(static_offset, oscillators, path=path)
+
     return ContinuousEmotion(
         name=data["name"],
         description=str(data.get("description", "")),
@@ -288,6 +275,49 @@ def _parse_continuous(data: dict, path: Path) -> ContinuousEmotion:
         oscillators=oscillators,
         loops=bool(data.get("loops", True)),
     )
+
+
+def _check_oscillator_worst_case(
+    static_offset: EmotionPose,
+    oscillators: List[Oscillator],
+    *,
+    path: Path,
+) -> None:
+    """Refuse continuous emotions whose oscillator peaks leave the envelope.
+
+    The peak excursion on each axis is `static_offset ± Σ|amplitude|` over
+    every oscillator targeting that axis. Since the envelope check is
+    symmetric (`abs(value) > limit`), the worst-case magnitude per axis is
+    `|static| + Σ|amplitude|` (triangle inequality). We synthesise a pose
+    holding that magnitude per axis and run it through the same envelope
+    check used for static poses — same error format, same limits.
+    """
+    sums: Dict[str, float] = {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "roll": 0.0,
+        "pitch": 0.0,
+        "yaw": 0.0,
+        "antenna_right": 0.0,
+        "antenna_left": 0.0,
+        "body_yaw": 0.0,
+    }
+    for osc in oscillators:
+        sums[osc.field] = sums[osc.field] + abs(osc.amplitude)
+
+    worst = EmotionPose(
+        x=abs(static_offset.x) + sums["x"],
+        y=abs(static_offset.y) + sums["y"],
+        z=abs(static_offset.z) + sums["z"],
+        roll=abs(static_offset.roll) + sums["roll"],
+        pitch=abs(static_offset.pitch) + sums["pitch"],
+        yaw=abs(static_offset.yaw) + sums["yaw"],
+        antenna_right=abs(static_offset.antenna_right) + sums["antenna_right"],
+        antenna_left=abs(static_offset.antenna_left) + sums["antenna_left"],
+        body_yaw=abs(static_offset.body_yaw) + sums["body_yaw"],
+    )
+    _check_safe_envelope(worst, path=path, where="oscillator worst-case")
 
 
 # -----------------------------------------------------------------------------
@@ -315,9 +345,7 @@ def load_emotion_file(path: Path) -> Emotion:
         return _parse_one_shot(data, path)
     if emotion_type == "continuous":
         return _parse_continuous(data, path)
-    raise EmotionConfigError(
-        f"{path}: `type:` must be 'one_shot' or 'continuous', got {emotion_type!r}"
-    )
+    raise EmotionConfigError(f"{path}: `type:` must be 'one_shot' or 'continuous', got {emotion_type!r}")
 
 
 def load_emotions(emotions_dir: Path) -> Dict[str, Emotion]:
@@ -337,8 +365,7 @@ def load_emotions(emotions_dir: Path) -> Dict[str, Emotion]:
         emotion = load_emotion_file(path)
         if emotion.name in result:
             raise EmotionConfigError(
-                f"{path}: duplicate emotion name {emotion.name!r}; "
-                f"previously defined in another file"
+                f"{path}: duplicate emotion name {emotion.name!r}; previously defined in another file"
             )
         result[emotion.name] = emotion
         logger.info("Loaded emotion %r (%s) from %s", emotion.name, type(emotion).__name__, path.name)
