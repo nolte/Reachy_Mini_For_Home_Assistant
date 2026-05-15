@@ -28,6 +28,16 @@ class ReachyMiniHomeAssistant(ReachyMiniApp):
 
     # No custom web UI needed - configuration is automatic via Home Assistant
     custom_app_url: str | None = None
+    # Force the SDK's local IPC media backend instead of WebRTC. The "default"
+    # backend falls back to WebRTC on "No local IPC endpoint" detection, but
+    # the WebRTC media stack races with the daemon's /ws/sdk command channel
+    # in a way that silently drops every set_target the app issues — including
+    # the EmotionPlayer worker's commands. With "local" the app keeps audio
+    # and camera while emotions actually reach the servos. Empirically
+    # verified on Pollen daemon 1.7.1 (Wireless), 2026-05-15. See the memory
+    # entry pollen_lock_blocks_external_settarget.md for the full diagnosis
+    # trail.
+    request_media_backend: str | None = "local"
 
     def __init__(self, *args, **kwargs):
         """Initialize the app."""
