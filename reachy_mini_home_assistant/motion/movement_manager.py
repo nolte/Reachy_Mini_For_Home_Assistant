@@ -1040,9 +1040,14 @@ class MovementManager:
             logger.warning("Could not enable motors on startup: %s", motor_err)
 
         # Reset to neutral position first (handles restart after crash/disconnect)
-        # This ensures head returns to center on app startup
-        self.reset_to_neutral(duration=0.5)
-        logger.info("Reset to neutral position on startup")
+        # This ensures head returns to center on app startup.
+        # FIX 2026-05-15: duration was 0.5s. From Sleep-Pose (antennas ±175°)
+        # that is ~350°/s, which trips the Dynamixel XL330-M077-T Overload
+        # Error on the antenna motors. The motors then silently ignore all
+        # subsequent commands until a daemon restart — set_target calls return
+        # ok but the servos don't move. 3.0s is a safe ramp from any HW state.
+        self.reset_to_neutral(duration=3.0)
+        logger.info("Reset to neutral position on startup (3s safe ramp)")
 
         # Initialize idle animation immediately so breathing starts on launch
         # This matches the reference project's behavior where BreathingMove
