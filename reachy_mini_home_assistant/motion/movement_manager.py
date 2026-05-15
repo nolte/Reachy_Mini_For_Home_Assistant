@@ -115,8 +115,14 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": 0.0,
-    "antenna_left_rad": 0.0,
-    "antenna_right_rad": 0.0,
+    # FIX 2026-05-15: was 0.0/0.0. Antenna setpoint at exactly 0° lands in
+    # the per-servo deadband (see memory antenna_servo_zero_wobble.md), so
+    # the antennas pendulate at ~±0.5° around the target instead of holding
+    # still. +15° on both shafts is safely outside the deadband for both
+    # servos and matches the Pollen SDK's INIT_ANTENNAS_JOINT_POSITIONS
+    # spirit (~±10° at boot).
+    "antenna_left_rad": 0.2618,   # +15° in radians
+    "antenna_right_rad": 0.2618,  # +15°
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"

@@ -22,4 +22,6 @@ phases:
   - name: slow_rise
     duration_s: 1.00
     easing: ease_in_out
-    end: {}
+    end:  # FIX 2026-05-15: was {}; antennas at 0° trip Dynamixel deadband
+      antenna_left_deg: 15
+      antenna_right_deg: 15

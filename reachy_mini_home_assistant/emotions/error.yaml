@@ -38,4 +38,6 @@ phases:
   - name: home
     duration_s: 0.50
     easing: min_jerk
-    end: {}
+    end:  # FIX 2026-05-15: was {}; antennas at 0° trip Dynamixel deadband
+      antenna_left_deg: 15
+      antenna_right_deg: 15
