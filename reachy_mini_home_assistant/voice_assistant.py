@@ -623,11 +623,26 @@ class VoiceAssistantService:
             self._resume_non_esphome_services(reason="ha_connected")
 
     def _on_ha_disconnected(self) -> None:
-        """Called when Home Assistant disconnects."""
-        _LOGGER.warning("Home Assistant disconnected - suspending camera and voice services")
-        self._ha_connected = False
+        """Called when Home Assistant disconnects.
 
-        self._suspend_non_esphome_services(reason="ha_disconnected")
+        Intentionally a no-op for now. HA's ESPHome integration spawns
+        short-lived TCP probes from a separate IP that connect, perform no
+        ESPHome handshake, and disconnect within milliseconds. Each one
+        triggers Protocol.connection_lost on a fresh VoiceSatelliteProtocol
+        instance and fires this callback, even though the real session
+        connection is still alive. Tearing down camera / audio / motion on
+        every probe leaves the app stuck in "Services suspended - ESPHome
+        only" for the rest of the session, since no reconnect follows.
+
+        Until we can distinguish probe disconnects from real session ends
+        at the protocol layer (e.g. by tracking the active connection set
+        and only firing this when zero remain), keep the services running
+        and just record the state flag. Emotions, voice pipeline, and
+        camera keep working through probe storms. Empirically verified on
+        Pollen daemon 1.7.1 (Wireless), 2026-05-15.
+        """
+        _LOGGER.info("HA TCP disconnect event ignored (likely probe, services remain active)")
+        self._ha_connected = False
 
     async def stop(self) -> None:
         """Stop the voice assistant service."""
