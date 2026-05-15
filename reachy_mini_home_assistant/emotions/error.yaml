@@ -1,43 +1,44 @@
-# Slow head shake "no", for "command failed / unintelligible". ~2 s total.
+# Slow, deliberate head-shake "no" for command failures. ~3.6 s total.
+# Revised 2026-05-15: wider yaw + longer holds for clear "no" gesture.
 name: error
-description: Slow head-shake "no" for command failures
+description: Slow deliberate head-shake "no" for command failures
 type: one_shot
 phases:
   - name: left_1
-    duration_s: 0.30
-    easing: ease_in_out
-    end:
-      pitch_deg: -3
-      yaw_deg: -18
-      antenna_left_deg: -10
-      antenna_right_deg: 10
-  - name: right_1
-    duration_s: 0.40
-    easing: ease_in_out
-    end:
-      pitch_deg: -3
-      yaw_deg: 18
-      antenna_left_deg: 10
-      antenna_right_deg: -10
-  - name: left_2
-    duration_s: 0.40
-    easing: ease_in_out
-    end:
-      pitch_deg: -3
-      yaw_deg: -18
-      antenna_left_deg: -10
-      antenna_right_deg: 10
-  - name: right_2
-    duration_s: 0.40
-    easing: ease_in_out
-    end:
-      pitch_deg: -3
-      yaw_deg: 18
-      antenna_left_deg: 10
-      antenna_right_deg: -10
-  - name: home
     duration_s: 0.50
+    easing: ease_in_out
+    end:
+      pitch_deg: -5
+      yaw_deg: -25
+      antenna_left_deg: -15
+      antenna_right_deg: 15
+  - name: right_1
+    duration_s: 0.65
+    easing: ease_in_out
+    end:
+      pitch_deg: -5
+      yaw_deg: 25
+      antenna_left_deg: 15
+      antenna_right_deg: -15
+  - name: left_2
+    duration_s: 0.65
+    easing: ease_in_out
+    end:
+      pitch_deg: -5
+      yaw_deg: -25
+      antenna_left_deg: -15
+      antenna_right_deg: 15
+  - name: right_2
+    duration_s: 0.65
+    easing: ease_in_out
+    end:
+      pitch_deg: -5
+      yaw_deg: 25
+      antenna_left_deg: 15
+      antenna_right_deg: -15
+  - name: home
+    duration_s: 0.80
     easing: min_jerk
-    end:  # FIX 2026-05-15: was {}; antennas at 0° trip Dynamixel deadband
+    end:  # antennas at +15° (out of deadband)
       antenna_left_deg: 15
       antenna_right_deg: 15

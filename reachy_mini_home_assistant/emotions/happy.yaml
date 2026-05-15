@@ -1,51 +1,52 @@
-# Joyful head lift with antenna flare. ~2 s total.
+# Joyful head lift with antenna flare and three clear bobs. ~3.2 s total.
+# Revised 2026-05-15: longer durations + larger amplitudes for visible motion.
 name: happy
-description: Joyful head lift with antenna flare and a small bob
+description: Joyful head lift with antenna flare, hold, three bobs, return
 type: one_shot
 phases:
   - name: lift
-    duration_s: 0.30
+    duration_s: 0.50
     easing: cartoon
     end:
-      z_mm: 8
-      pitch_deg: 12
-      antenna_left_deg: 45
-      antenna_right_deg: -45
+      z_mm: 10
+      pitch_deg: 18
+      antenna_left_deg: 60
+      antenna_right_deg: -60
   - name: hold
-    duration_s: 0.40
+    duration_s: 0.70
     easing: linear
     end:
-      z_mm: 8
-      pitch_deg: 12
-      antenna_left_deg: 45
-      antenna_right_deg: -45
+      z_mm: 10
+      pitch_deg: 18
+      antenna_left_deg: 60
+      antenna_right_deg: -60
   - name: bob_down
-    duration_s: 0.25
+    duration_s: 0.40
     easing: min_jerk
     end:
-      z_mm: 3
-      pitch_deg: 8
-      antenna_left_deg: 35
-      antenna_right_deg: -35
-  - name: bob_up
-    duration_s: 0.25
-    easing: min_jerk
-    end:
-      z_mm: 8
+      z_mm: 4
       pitch_deg: 12
       antenna_left_deg: 45
       antenna_right_deg: -45
-  - name: bob_down_2
-    duration_s: 0.25
+  - name: bob_up
+    duration_s: 0.40
     easing: min_jerk
     end:
-      z_mm: 3
-      pitch_deg: 8
-      antenna_left_deg: 35
-      antenna_right_deg: -35
-  - name: home
-    duration_s: 0.50
+      z_mm: 10
+      pitch_deg: 18
+      antenna_left_deg: 60
+      antenna_right_deg: -60
+  - name: bob_down_2
+    duration_s: 0.40
     easing: min_jerk
-    end:  # FIX 2026-05-15: was {}; antennas at 0° trip Dynamixel deadband
+    end:
+      z_mm: 4
+      pitch_deg: 12
+      antenna_left_deg: 45
+      antenna_right_deg: -45
+  - name: home
+    duration_s: 0.80
+    easing: min_jerk
+    end:  # antennas at +15° to leave Dynamixel deadband
       antenna_left_deg: 15
       antenna_right_deg: 15

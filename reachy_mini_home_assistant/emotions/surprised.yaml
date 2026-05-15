@@ -1,37 +1,38 @@
-# Quick recoil + antennas snap up + brief hold + return. ~1.4 s total.
+# Sharp recoil + antennas snap to near-max + held hold + settle. ~2.5 s total.
+# Revised 2026-05-15: more recoil, longer hold, antennas closer to envelope.
 name: surprised
-description: Quick recoil with antennas snapping up
+description: Quick recoil with antennas snapping near full extension
 type: one_shot
 phases:
   - name: recoil
-    duration_s: 0.15
+    duration_s: 0.25
     easing: cartoon
     end:
-      x_mm: -3
-      z_mm: 5
-      pitch_deg: 20
-      antenna_left_deg: 75
-      antenna_right_deg: -75
+      x_mm: -6
+      z_mm: 8
+      pitch_deg: 22
+      antenna_left_deg: 85
+      antenna_right_deg: -85
   - name: hold
-    duration_s: 0.45
+    duration_s: 0.90
     easing: linear
     end:
-      x_mm: -3
-      z_mm: 5
-      pitch_deg: 20
-      antenna_left_deg: 75
-      antenna_right_deg: -75
+      x_mm: -6
+      z_mm: 8
+      pitch_deg: 22
+      antenna_left_deg: 85
+      antenna_right_deg: -85
   - name: settle
-    duration_s: 0.30
-    easing: min_jerk
-    end:
-      z_mm: 2
-      pitch_deg: 5
-      antenna_left_deg: 30
-      antenna_right_deg: -30
-  - name: home
     duration_s: 0.50
     easing: min_jerk
-    end:  # FIX 2026-05-15: was {}; antennas at 0° trip Dynamixel deadband
+    end:
+      z_mm: 3
+      pitch_deg: 8
+      antenna_left_deg: 40
+      antenna_right_deg: -40
+  - name: home
+    duration_s: 0.90
+    easing: min_jerk
+    end:  # antennas at +15° (out of deadband)
       antenna_left_deg: 15
       antenna_right_deg: 15
