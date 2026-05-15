@@ -72,82 +72,24 @@ class EntityRegistry:
 
         # Emotion state
         self._current_emotion = "None"
-        # Map emotion names to available robot emotions
-        # Full list of available emotions from robot
-        self._emotion_map = {
+        # Map HA Select option labels → emotion_name dispatched to motion_bridge.
+        # Single source of truth: every entry resolves to a YAML in
+        # reachy_mini_home_assistant/emotions/<name>.yaml. EmotionPlayer plays
+        # it. The previous RecordedMoves catalogue (cheerful1, sad1, rage1, …)
+        # was removed on 2026-05-15 — those moves are unsafe for our
+        # safe-envelope contract and we now own the motion catalogue via YAML.
+        self._emotion_map: dict[str, str | None] = {
             "None": None,
-            # Basic emotions
-            "Happy": "cheerful1",
-            "Sad": "sad1",
-            "Angry": "rage1",
-            "Fear": "fear1",
-            "Surprise": "surprised1",
-            "Disgust": "disgusted1",
-            # Extended emotions
-            "Laughing": "laughing1",
-            "Loving": "loving1",
-            "Proud": "proud1",
-            "Grateful": "grateful1",
-            "Enthusiastic": "enthusiastic1",
-            "Curious": "curious1",
-            "Amazed": "amazed1",
-            "Shy": "shy1",
-            "Confused": "confused1",
-            "Thoughtful": "thoughtful1",
-            "Anxious": "anxiety1",
-            "Scared": "scared1",
-            "Frustrated": "frustrated1",
-            "Irritated": "irritated1",
-            "Furious": "furious1",
-            "Contempt": "contempt1",
-            "Bored": "boredom1",
-            "Tired": "tired1",
-            "Exhausted": "exhausted1",
-            "Lonely": "lonely1",
-            "Downcast": "downcast1",
-            "Resigned": "resigned1",
-            "Uncertain": "uncertain1",
-            "Uncomfortable": "uncomfortable1",
-            "Lost": "lost1",
-            "Indifferent": "indifferent1",
-            # Positive actions
-            "Yes": "yes1",
-            "No": "no1",
-            "Welcoming": "welcoming1",
-            "Helpful": "helpful1",
-            "Attentive": "attentive1",
-            "Understanding": "understanding1",
-            "Calming": "calming1",
-            "Relief": "relief1",
-            "Success": "success1",
-            "Serenity": "serenity1",
-            # Negative actions
-            "Oops": "oops1",
-            "Displeased": "displeased1",
-            "Impatient": "impatient1",
-            "Reprimand": "reprimand1",
-            "GoAway": "go_away1",
-            # Special
-            "Come": "come1",
-            "Inquiring": "inquiring1",
-            "Sleep": "sleep1",
-            "Dance": "dance1",
-            "Electric": "electric1",
-            "Dying": "dying1",
-            # YAML-defined emotions (new pipeline, Phase 2 wire-in).
-            # The bare names (without trailing digit) match
-            # reachy_mini_home_assistant/emotions/*.yaml and are dispatched
-            # to EmotionPlayer in motion_bridge.queue_emotion_move.
-            "Happy (v2)": "happy",
-            "Sad (v2)": "sad",
-            "Surprised (v2)": "surprised",
-            "Curious (v2)": "curious",
             "Acknowledge": "acknowledge",
+            "Curious": "curious",
             "Error": "error",
-            "Idle (v2)": "idle",
-            "Listening (v2)": "listening",
-            "Thinking (v2)": "thinking",
-            "Speaking (v2)": "speaking",
+            "Happy": "happy",
+            "Idle": "idle",
+            "Listening": "listening",
+            "Sad": "sad",
+            "Speaking": "speaking",
+            "Surprised": "surprised",
+            "Thinking": "thinking",
         }
 
     def _get_preferences(self) -> Preferences | None:

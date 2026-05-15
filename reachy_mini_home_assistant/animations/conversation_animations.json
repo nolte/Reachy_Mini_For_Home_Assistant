@@ -1168,7 +1168,7 @@
             "binary_sensor.front_door": [
                 {
                     "state": "on",
-                    "emotion": "curious1",
+                    "emotion": "curious",
                     "cooldown": 30.0,
                     "priority": 70,
                     "description": "Someone at the door - robot looks curious"
@@ -1177,7 +1177,7 @@
             "binary_sensor.back_door": [
                 {
                     "state": "on",
-                    "emotion": "surprised1",
+                    "emotion": "surprised",
                     "cooldown": 30.0,
                     "priority": 60,
                     "description": "Back door opened - robot looks alert"
@@ -1186,7 +1186,7 @@
             "binary_sensor.living_room_motion": [
                 {
                     "state": "on",
-                    "emotion": "surprised1",
+                    "emotion": "surprised",
                     "cooldown": 120.0,
                     "priority": 40,
                     "description": "Motion detected - brief alert"
@@ -1195,7 +1195,7 @@
             "binary_sensor.doorbell": [
                 {
                     "state": "on",
-                    "emotion": "enthusiastic1",
+                    "emotion": "happy",
                     "cooldown": 10.0,
                     "priority": 90,
                     "description": "Doorbell rang - excited reaction"
@@ -1204,7 +1204,7 @@
             "input_boolean.morning_routine": [
                 {
                     "state": "on",
-                    "emotion": "cheerful1",
+                    "emotion": "happy",
                     "cooldown": 3600.0,
                     "priority": 60,
                     "description": "Morning routine started - happy greeting"
@@ -1213,7 +1213,7 @@
             "input_boolean.bedtime_routine": [
                 {
                     "state": "on",
-                    "emotion": "sleep1",
+                    "emotion": "idle",
                     "cooldown": 3600.0,
                     "priority": 60,
                     "description": "Bedtime - sleepy animation"
@@ -1222,7 +1222,7 @@
             "input_boolean.party_mode": [
                 {
                     "state": "on",
-                    "emotion": "cheerful1",
+                    "emotion": "happy",
                     "cooldown": 60.0,
                     "priority": 50,
                     "description": "Party mode activated - cheerful"
@@ -1231,7 +1231,7 @@
             "input_boolean.robot_happy_trigger": [
                 {
                     "state": "on",
-                    "emotion": "cheerful1",
+                    "emotion": "happy",
                     "cooldown": 5.0,
                     "priority": 80,
                     "description": "Manual happy trigger from HA automation"
@@ -1240,7 +1240,7 @@
             "input_boolean.robot_sad_trigger": [
                 {
                     "state": "on",
-                    "emotion": "sad1",
+                    "emotion": "sad",
                     "cooldown": 5.0,
                     "priority": 80,
                     "description": "Manual sad trigger from HA automation"
@@ -1249,7 +1249,7 @@
             "input_boolean.robot_alert_trigger": [
                 {
                     "state": "on",
-                    "emotion": "surprised1",
+                    "emotion": "surprised",
                     "cooldown": 5.0,
                     "priority": 80,
                     "description": "Manual alert trigger from HA automation"
