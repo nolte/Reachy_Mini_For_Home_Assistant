@@ -69,7 +69,7 @@ include-package-data = true
 where = ["."]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.flac", "*.md", "*.tflite", "*.onnx", "*.pt"]
+"*" = ["*.json", "*.flac", "*.md", "*.tflite", "*.onnx", "*.pt", "*.yaml"]
 
 # ============================================================================
 # Ruff - Fast Python linter and formatter
