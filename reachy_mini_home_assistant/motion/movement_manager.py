@@ -121,16 +121,14 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": -0.025,                 # head lowered by 25 mm (deeper tuck)
-    # Antennas at SAME-SIGN max negative (App[-85°, -85°] → Servo[+85°, +85°]).
-    # Both antennas tilted the same direction simultaneously — instead of
-    # crossing above the head (inward) or splaying sideways (outward), they
-    # both kip into the same plane. Goal: tips pointing straight down (or as
-    # close as the Servo axis allows). NB: same-sign is mechanically
-    # asymmetric to gravity (see antenna-servo-zero-wobble memory) — at ±85°
-    # near mechanical limit the wobble effect is likely smaller than at ±15°,
-    # but worth verifying live with a bit-identity multi-read.
-    "antenna_left_rad": -1.4835,   # app-world -85° → mechanical Servo-left +85°
-    "antenna_right_rad": -1.4835,  # app-world -85° → mechanical Servo-right +85° (same-sign!)
+    # Antennas at SAME-SIGN extreme (App[-175°, -175°] → Servo[-175°, -175°]).
+    # Earlier same-sign at ±85° produced antenna tips pointing LEFT (operator
+    # feedback). To get tips-down we rotate ~90° further in the same direction
+    # → ~-175°. Possibly hitting mechanical limit; if so, the read will show
+    # the actual end-stop. Beyond App-catalog envelope of ±90°, but the idle
+    # pose doesn't route through clamp_to_envelope.
+    "antenna_left_rad": -3.054,    # app-world -175° → mechanical Servo-left -175° (same-sign!)
+    "antenna_right_rad": -3.054,   # app-world -175° → mechanical Servo-right -175°
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"

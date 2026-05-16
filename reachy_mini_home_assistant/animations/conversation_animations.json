@@ -43,15 +43,15 @@
         }
     },
     "idle_rest_pose": {
-        "description": "EXPERIMENT 2026-05-16 — DEEPLY tucked / drawn-in idle pose with SAME-SIGN antennas (App[-85°, -85°] → Servo[+85°, +85°]). Both antennas tilted in the same direction simultaneously to try to produce tips-pointing-straight-down. Head pitched chin-DOWN (+20°) and Stewart-platform lowered by 25 mm. Same-sign antennas are mechanically asymmetric to gravity — wobble verification needed.",
+        "description": "EXPERIMENT 2026-05-16 — DEEPLY tucked idle pose with SAME-SIGN extreme antennas (App[-175°, -175°] → Servo[-175°, -175°]). Operator feedback: ±85° same-sign points the tips LEFT; rotating ~90° further in the same direction should put the tips down. Beyond App catalog envelope (±90°) — idle pose bypasses clamp_to_envelope.",
         "pitch_deg": 20.0,
         "yaw_deg": 0.0,
         "roll_deg": 0.0,
         "x_m": 0.0,
         "y_m": 0.0,
         "z_m": -0.025,
-        "antenna_left_rad": -1.4835298641951802,
-        "antenna_right_rad": -1.4835298641951802
+        "antenna_left_rad": -3.054326190990077,
+        "antenna_right_rad": -3.054326190990077
     },
     "emotions": {
         "happy": {
