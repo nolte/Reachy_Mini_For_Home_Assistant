@@ -127,8 +127,8 @@ DEFAULT_IDLE_REST_POSE = {
     # → ~-175°. Possibly hitting mechanical limit; if so, the read will show
     # the actual end-stop. Beyond App-catalog envelope of ±90°, but the idle
     # pose doesn't route through clamp_to_envelope.
-    "antenna_left_rad": -3.054,    # app-world -175° → mechanical Servo-left -175° (same-sign!)
-    "antenna_right_rad": -3.054,   # app-world -175° → mechanical Servo-right -175°
+    "antenna_left_rad": -3.229,    # app-world -185° → mechanical Servo-RIGHT -185° (10° beyond left)
+    "antenna_right_rad": -3.054,   # app-world -175° → mechanical Servo-LEFT -175°
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
