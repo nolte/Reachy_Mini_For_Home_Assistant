@@ -20,10 +20,13 @@ Invariants:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 
 from reachy_mini.utils.interpolation import time_trajectory
@@ -198,6 +201,17 @@ class EmotionPlayer:
         try:
             if self._on_pause is not None:
                 self._on_pause()
+
+            # Pre-Neutral HTTP-goto anchor (deterministic IK branch).
+            # `set_target` alone leaves the Stewart-Hexapod backend trailing
+            # (verified 2026-05-17: set_target only moves antennas reliably,
+            # head pose drifts). HTTP /api/move/goto installs a persistent
+            # target the daemon's IK actually follows. We block for the
+            # full goto duration so the next `_run_*` phase starts from a
+            # known NEUTRAL pose.
+            self._send_pre_neutral_goto_http()
+            time.sleep(PRE_NEUTRAL_S + 0.3)
+
             try:
                 self._reachy.set_automatic_body_yaw(False)
             except Exception as e:
@@ -231,24 +245,13 @@ class EmotionPlayer:
     # ------------------------------------------------------------------
 
     def _run_one_shot(self, emotion: OneShotEmotion) -> None:
-        # Phase A: read the real current pose so the pre-neutral anchor
-        # starts from where the hardware actually is.
+        # Phase A: read the (now near-NEUTRAL) pose left by the
+        # pre-neutral HTTP-goto in _worker_main. The next lead-in starts
+        # from there.
         start_pose = self._read_present_pose_safe()
         first_phase_end = emotion.phases[0].end
 
-        # Phase A.5: PRE-NEUTRAL ANCHOR. Without this, the Stewart-IK can
-        # land on a "twisted" branch when an emotion launches from an
-        # extreme idle pose (e.g. tucked Servo[-180°, -180°] head fully
-        # down). Routing the emotion start through NEUTRAL = identity head
-        # + zero antennas resets the IK to a deterministic Joint vector,
-        # so the actual first phase is reached on the correct IK branch.
-        # The brief sweep through antenna 0° (≤ 0.6 s during motion, never
-        # stationary) is within the empirical tolerance for the deadband.
-        if not self._cancel_event.is_set():
-            self._run_lerp(start_pose, NEUTRAL, PRE_NEUTRAL_S, time_trajectory_for_easing=None)
-            start_pose = NEUTRAL  # subsequent lead-in starts from NEUTRAL
-
-        # Phase B: lead-in (from NEUTRAL to the first phase target).
+        # Phase B: lead-in (from ~NEUTRAL to the first phase target).
         if not self._cancel_event.is_set():
             self._run_lerp(start_pose, first_phase_end, LEAD_IN_S, time_trajectory_for_easing=None)
 
@@ -310,15 +313,10 @@ class EmotionPlayer:
     # ------------------------------------------------------------------
 
     def _run_continuous(self, emotion: ContinuousEmotion) -> None:
-        # Lead-in: real present pose → t=0 sample of the emotion.
+        # Lead-in: present pose (now ~NEUTRAL after the pre-neutral
+        # HTTP-goto in _worker_main) → t=0 sample of the emotion.
         start_pose = self._read_present_pose_safe()
         first_sample = sample_continuous(emotion, 0.0)
-        # Pre-neutral anchor (see _run_one_shot for rationale): route the
-        # start through NEUTRAL so the Stewart-IK lands on a deterministic
-        # branch before the oscillator loop begins.
-        if not self._cancel_event.is_set():
-            self._run_lerp(start_pose, NEUTRAL, PRE_NEUTRAL_S)
-            start_pose = NEUTRAL
         if not self._cancel_event.is_set():
             self._run_lerp(start_pose, first_sample, LEAD_IN_S)
 
@@ -460,3 +458,34 @@ class EmotionPlayer:
             )
             return NEUTRAL
         return present
+
+    def _send_pre_neutral_goto_http(self) -> None:
+        """Send a pre-emotion HTTP-goto to NEUTRAL via the daemon's REST
+        surface. Used as a deterministic IK anchor: `set_target` alone
+        leaves the Stewart-Hexapod backend trailing in this daemon config
+        (backend.ready=false), but `/api/move/goto` reliably installs a
+        persistent target the daemon's IK follows for both antennas
+        and head DoFs. The caller blocks for `PRE_NEUTRAL_S + 0.3` after
+        this returns to let the trajectory finish."""
+        try:
+            body = json.dumps({
+                # NEUTRAL pose: head = identity, body_yaw = 0.
+                "head_pose": {"x": 0.0, "y": 0.0, "z": 0.0,
+                              "roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+                # Antennas at 0/0 — they cross the 0° deadband during the
+                # 0.6 s sweep but never sit stationary at 0, so the deadband
+                # wobble is not triggered.
+                "antennas": [0.0, 0.0],
+                "body_yaw": 0.0,
+                "duration": PRE_NEUTRAL_S,
+                "interpolation": "minjerk",
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "http://localhost:8000/api/move/goto",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=0.5).read()
+        except (urllib.error.URLError, TimeoutError) as e:
+            logger.warning("Pre-neutral HTTP goto failed (continuing without anchor): %s", e)
