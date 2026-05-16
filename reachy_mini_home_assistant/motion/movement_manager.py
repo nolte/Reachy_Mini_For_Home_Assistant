@@ -109,26 +109,20 @@ IDLE_LOOK_AROUND_DURATION = 2.0  # Duration of look-around action in seconds
 IDLE_INACTIVITY_THRESHOLD = 6.0  # Seconds of inactivity before look-around starts
 IDLE_LOOK_AROUND_PROBABILITY = 0.8  # Otherwise keep breathing-only cycle
 DEFAULT_IDLE_REST_POSE = {
-    "pitch_deg": 0.0,
+    # EXPERIMENT 2026-05-16 — "tucked" idle pose. Head pitched forward and
+    # slightly lowered to evoke a "settled / drawn-in" resting posture.
+    # Antennas flipped to inward-V (Servo[L=+15°, R=-15°]) to match the
+    # tucked aesthetic. Same antenna-mirror convention as before applies:
+    # app-world `antenna_left` drives mechanical Servo-right, see the
+    # `pollen_daemon_antenna_http_order` memory for the SDK source-doc lie.
+    "pitch_deg": -20.0,            # chin slightly down (tucked)
     "yaw_deg": 0.0,
     "roll_deg": 0.0,
     "x_m": 0.0,
     "y_m": 0.0,
-    "z_m": 0.0,
-    # FIX 2026-05-16 (round 2): the app-world variables `antenna_left` /
-    # `antenna_right` are SIGN-MIRRORED vs the mechanical hardware because
-    # the SDK source-comment "antennas=[right, left]" disagrees with the
-    # WS protocol which actually expects [left, right]. The SDK passes the
-    # list unmodified, so the app-named `antenna_left` ends up driving the
-    # mechanical "right" servo and vice versa. Every existing choreography
-    # in the repo already accounts for this (e.g. listening: left=+20,
-    # right=-20 produces outward-V mechanically). The idle-rest-pose
-    # therefore needs the same convention: left=+0.2618 / right=-0.2618
-    # gives Servo[left=-, right=+] = outward-V (Eselsohren), gravity-
-    # symmetric and visually correct. The opposite sign pair (left=-0.2618
-    # / right=+0.2618) would give inward-V — stable but visually wrong.
-    "antenna_left_rad": 0.2618,    # app-world +15° → mechanical Servo-left -15° (outward)
-    "antenna_right_rad": -0.2618,  # app-world -15° → mechanical Servo-right +15° (outward)
+    "z_m": -0.012,                 # head lowered by 12 mm
+    "antenna_left_rad": -0.2618,   # app-world -15° → mechanical Servo-left +15° (inward)
+    "antenna_right_rad": 0.2618,   # app-world +15° → mechanical Servo-right -15° (inward)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
