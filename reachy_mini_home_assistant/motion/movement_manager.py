@@ -120,12 +120,14 @@ DEFAULT_IDLE_REST_POSE = {
     "roll_deg": 0.0,
     "x_m": 0.0,
     "y_m": 0.0,
-    "z_m": -0.012,                 # head lowered by 12 mm
-    # Antennas pushed to strong-inward (Servo[L=+40°, R=-40°]) so the tips hang
-    # together pointing down/inward, evoking the "drawn-in / dozing" look that
-    # `sad.yaml drop` uses for its sad pose. Same antenna-mirror convention.
-    "antenna_left_rad": -0.6981,   # app-world -40° → mechanical Servo-left +40° (strong inward)
-    "antenna_right_rad": 0.6981,   # app-world +40° → mechanical Servo-right -40° (strong inward)
+    "z_m": -0.025,                 # head lowered by 25 mm (deeper tuck)
+    # Antennas pushed to MAX inward (Servo[L=+85°, R=-85°], near catalog envelope
+    # of ±90°). At this magnitude the antennas cross above the head — the tips
+    # fall behind the head and point downward/backward. Same antenna-mirror
+    # convention. ±85° is also what `surprised.yaml recoil` uses (in opposite
+    # signs), so we know it's within mechanical safe range.
+    "antenna_left_rad": -1.4835,   # app-world -85° → mechanical Servo-left +85° (max inward, crossed)
+    "antenna_right_rad": 1.4835,   # app-world +85° → mechanical Servo-right -85° (max inward, crossed)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"

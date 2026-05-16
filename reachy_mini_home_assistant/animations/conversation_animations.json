@@ -43,15 +43,15 @@
         }
     },
     "idle_rest_pose": {
-        "description": "EXPERIMENT 2026-05-16 — tucked / drawn-in idle pose. Head pitched chin-DOWN (+20°, empirically verified) and Stewart-platform lowered by 12 mm. Antennas at STRONG inward (Servo[L=+40°/R=-40°]) so the tips hang together pointing inward-down (like sad.yaml drop). Same antenna-mirror convention as outward-V.",
+        "description": "EXPERIMENT 2026-05-16 — DEEPLY tucked / drawn-in idle pose. Head pitched chin-DOWN (+20°) and Stewart-platform lowered by 25 mm (deep tuck). Antennas at MAX inward (Servo[L=+85°/R=-85°], near ±90° envelope) so the tips cross over the head and point down/backward. Same antenna-mirror convention as outward-V.",
         "pitch_deg": 20.0,
         "yaw_deg": 0.0,
         "roll_deg": 0.0,
         "x_m": 0.0,
         "y_m": 0.0,
-        "z_m": -0.012,
-        "antenna_left_rad": -0.6981317007977318,
-        "antenna_right_rad": 0.6981317007977318
+        "z_m": -0.025,
+        "antenna_left_rad": -1.4835298641951802,
+        "antenna_right_rad": 1.4835298641951802
     },
     "emotions": {
         "happy": {
