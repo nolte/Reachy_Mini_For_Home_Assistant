@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # Defaults — see docs/refactor-emotion-pipeline-design.md §10 for rationale.
 # -----------------------------------------------------------------------------
 
+PRE_NEUTRAL_S = 0.6  # deterministic IK anchor: any-pose → NEUTRAL before lead-in
 LEAD_IN_S = 0.5  # smooth pre-emotion → first animation pose
 EASE_OUT_S = 0.5  # smooth animation tail → rest pose
 TICK_S = 0.02  # 50 Hz, same as reference app
@@ -140,7 +141,7 @@ class EmotionPlayer:
             # out and wait briefly for it to leave.
             if self._worker is not None and self._worker.is_alive():
                 self._cancel_event.set()
-                self._worker.join(timeout=LEAD_IN_S + EASE_OUT_S + 0.5)
+                self._worker.join(timeout=PRE_NEUTRAL_S + LEAD_IN_S + EASE_OUT_S + 0.5)
                 if self._worker.is_alive():
                     logger.warning(
                         "Previous emotion %r did not join in time; spawning new worker anyway",
@@ -230,12 +231,24 @@ class EmotionPlayer:
     # ------------------------------------------------------------------
 
     def _run_one_shot(self, emotion: OneShotEmotion) -> None:
-        # Phase A: read the real current pose so the lead-in starts where
-        # the hardware actually is.
+        # Phase A: read the real current pose so the pre-neutral anchor
+        # starts from where the hardware actually is.
         start_pose = self._read_present_pose_safe()
         first_phase_end = emotion.phases[0].end
 
-        # Phase B: lead-in.
+        # Phase A.5: PRE-NEUTRAL ANCHOR. Without this, the Stewart-IK can
+        # land on a "twisted" branch when an emotion launches from an
+        # extreme idle pose (e.g. tucked Servo[-180°, -180°] head fully
+        # down). Routing the emotion start through NEUTRAL = identity head
+        # + zero antennas resets the IK to a deterministic Joint vector,
+        # so the actual first phase is reached on the correct IK branch.
+        # The brief sweep through antenna 0° (≤ 0.6 s during motion, never
+        # stationary) is within the empirical tolerance for the deadband.
+        if not self._cancel_event.is_set():
+            self._run_lerp(start_pose, NEUTRAL, PRE_NEUTRAL_S, time_trajectory_for_easing=None)
+            start_pose = NEUTRAL  # subsequent lead-in starts from NEUTRAL
+
+        # Phase B: lead-in (from NEUTRAL to the first phase target).
         if not self._cancel_event.is_set():
             self._run_lerp(start_pose, first_phase_end, LEAD_IN_S, time_trajectory_for_easing=None)
 
@@ -300,6 +313,12 @@ class EmotionPlayer:
         # Lead-in: real present pose → t=0 sample of the emotion.
         start_pose = self._read_present_pose_safe()
         first_sample = sample_continuous(emotion, 0.0)
+        # Pre-neutral anchor (see _run_one_shot for rationale): route the
+        # start through NEUTRAL so the Stewart-IK lands on a deterministic
+        # branch before the oscillator loop begins.
+        if not self._cancel_event.is_set():
+            self._run_lerp(start_pose, NEUTRAL, PRE_NEUTRAL_S)
+            start_pose = NEUTRAL
         if not self._cancel_event.is_set():
             self._run_lerp(start_pose, first_sample, LEAD_IN_S)
 
