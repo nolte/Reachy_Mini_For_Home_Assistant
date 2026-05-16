@@ -23,6 +23,6 @@ phases:
   - name: slow_rise
     duration_s: 1.40
     easing: ease_in_out
-    end:  # antennas at +15° (out of deadband)
+    end:  # outward-V idle: app-world (+15, -15) → mechanical Servo[L=-15°, R=+15°]
       antenna_left_deg: 15
-      antenna_right_deg: 15
+      antenna_right_deg: -15

@@ -115,14 +115,20 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": 0.0,
-    # FIX 2026-05-15: was 0.0/0.0. Antenna setpoint at exactly 0° lands in
-    # the per-servo deadband (see memory antenna_servo_zero_wobble.md), so
-    # the antennas pendulate at ~±0.5° around the target instead of holding
-    # still. +15° on both shafts is safely outside the deadband for both
-    # servos and matches the Pollen SDK's INIT_ANTENNAS_JOINT_POSITIONS
-    # spirit (~±10° at boot).
-    "antenna_left_rad": 0.2618,   # +15° in radians
-    "antenna_right_rad": 0.2618,  # +15°
+    # FIX 2026-05-16 (round 2): the app-world variables `antenna_left` /
+    # `antenna_right` are SIGN-MIRRORED vs the mechanical hardware because
+    # the SDK source-comment "antennas=[right, left]" disagrees with the
+    # WS protocol which actually expects [left, right]. The SDK passes the
+    # list unmodified, so the app-named `antenna_left` ends up driving the
+    # mechanical "right" servo and vice versa. Every existing choreography
+    # in the repo already accounts for this (e.g. listening: left=+20,
+    # right=-20 produces outward-V mechanically). The idle-rest-pose
+    # therefore needs the same convention: left=+0.2618 / right=-0.2618
+    # gives Servo[left=-, right=+] = outward-V (Eselsohren), gravity-
+    # symmetric and visually correct. The opposite sign pair (left=-0.2618
+    # / right=+0.2618) would give inward-V — stable but visually wrong.
+    "antenna_left_rad": 0.2618,    # app-world +15° → mechanical Servo-left -15° (outward)
+    "antenna_right_rad": -0.2618,  # app-world -15° → mechanical Servo-right +15° (outward)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"

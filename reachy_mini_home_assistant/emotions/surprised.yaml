@@ -33,6 +33,6 @@ phases:
   - name: home
     duration_s: 0.90
     easing: min_jerk
-    end:  # antennas at +15° (out of deadband)
+    end:  # outward-V idle: app-world (+15, -15) → mechanical Servo[L=-15°, R=+15°]
       antenna_left_deg: 15
-      antenna_right_deg: 15
+      antenna_right_deg: -15

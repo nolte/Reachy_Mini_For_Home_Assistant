@@ -1,7 +1,10 @@
 # Slow breathing motion (4 s per cycle) — continuous, loops forever.
 # Identical to reference-app waiting-idle at BREATH_FREQ = 0.25 Hz.
+# Note (2026-05-16): antenna oscillators were removed because servo quantization
+# turned the ±2° sinusoid into a visible micro-step pattern (~0.4° peak-to-peak
+# discrete snapping). z_mm and pitch_deg still provide the visible breathing.
 name: idle
-description: Slow breathing motion when nothing else is happening
+description: Slow breathing motion when nothing else is happening (z + pitch only; antennas held still)
 type: continuous
 loops: true
 oscillators:
@@ -10,10 +13,4 @@ oscillators:
     frequency_hz: 0.25
   - field: pitch_deg
     amplitude: 1
-    frequency_hz: 0.25
-  - field: antenna_left_deg
-    amplitude: 2
-    frequency_hz: 0.25
-  - field: antenna_right_deg
-    amplitude: 2
     frequency_hz: 0.25
