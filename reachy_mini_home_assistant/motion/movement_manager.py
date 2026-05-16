@@ -115,7 +115,7 @@ DEFAULT_IDLE_REST_POSE = {
     # tucked aesthetic. Same antenna-mirror convention as before applies:
     # app-world `antenna_left` drives mechanical Servo-right, see the
     # `pollen_daemon_antenna_http_order` memory for the SDK source-doc lie.
-    "pitch_deg": -20.0,            # chin slightly down (tucked)
+    "pitch_deg": 20.0,             # chin down — empirically verified 2026-05-16: negative pitch makes robot look UP, not down. positive pitch tucks the chin toward the chest.
     "yaw_deg": 0.0,
     "roll_deg": 0.0,
     "x_m": 0.0,

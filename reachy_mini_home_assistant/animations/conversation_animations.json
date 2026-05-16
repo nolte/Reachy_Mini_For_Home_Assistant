@@ -43,8 +43,8 @@
         }
     },
     "idle_rest_pose": {
-        "description": "EXPERIMENT 2026-05-16 — tucked / drawn-in idle pose. Head pitched chin-down (-20°) and lowered by 12 mm. Antennas flipped to inward-V (Servo[L=+15°/R=-15°]) for the tucked aesthetic. Same antenna-mirror convention as outward-V — app-world antenna_left drives mechanical Servo-right; see pollen-daemon-antenna-http-order memory.",
-        "pitch_deg": -20.0,
+        "description": "EXPERIMENT 2026-05-16 — tucked / drawn-in idle pose. Head pitched chin-DOWN (+20°, empirically verified: negative pitch makes the robot look UP, positive pitch tucks the chin) and Stewart-platform lowered by 12 mm. Antennas flipped to inward-V (Servo[L=+15°/R=-15°]) for the tucked aesthetic. Same antenna-mirror convention as outward-V — app-world antenna_left drives mechanical Servo-right; see pollen-daemon-antenna-http-order memory.",
+        "pitch_deg": 20.0,
         "yaw_deg": 0.0,
         "roll_deg": 0.0,
         "x_m": 0.0,
