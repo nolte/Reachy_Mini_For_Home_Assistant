@@ -136,7 +136,7 @@ DEFAULT_IDLE_REST_POSE = {
     # the slight asymmetry visually, but close enough that mechanical
     # pressure against the stop damps gravity-induced wobble.
     "antenna_left_rad": -3.14159,  # app-world -180° → Servo-RIGHT -180° (hardware stop)
-    "antenna_right_rad": -3.10669, # app-world -178° → Servo-LEFT -178° (2° off stop, wobble-damped)
+    "antenna_right_rad": -3.12414, # app-world -179° → Servo-LEFT -179° (1° off stop; 2° margin proved unstable 2026-05-16)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
