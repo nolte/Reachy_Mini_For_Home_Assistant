@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # Defaults — see docs/refactor-emotion-pipeline-design.md §10 for rationale.
 # -----------------------------------------------------------------------------
 
-PRE_NEUTRAL_S = 0.6  # deterministic IK anchor: any-pose → NEUTRAL before lead-in
+PRE_NEUTRAL_S = 1.5  # deterministic IK anchor; long enough for Stewart-Hexapod to actually reach NEUTRAL even from tucked-idle (z -47 → 0 mm, pitch +22 → 0°). Verified 2026-05-17: 0.6 s only reached antennas, Stewart lagged at pitch +31° / z -44 mm.
 LEAD_IN_S = 0.5  # smooth pre-emotion → first animation pose
 EASE_OUT_S = 0.5  # smooth animation tail → rest pose
 TICK_S = 0.02  # 50 Hz, same as reference app
