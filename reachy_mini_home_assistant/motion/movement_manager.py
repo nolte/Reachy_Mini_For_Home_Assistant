@@ -120,7 +120,7 @@ DEFAULT_IDLE_REST_POSE = {
     "roll_deg": 0.0,
     "x_m": 0.0,
     "y_m": 0.0,
-    "z_m": -0.045,                 # head lowered by 45 mm (max-tuck, near Stewart limit)
+    "z_m": -0.055,                 # head lowered by 55 mm (probe deeper; Stewart may clamp)
     # Antennas at SAME-SIGN extreme (App[-175°, -175°] → Servo[-175°, -175°]).
     # Earlier same-sign at ±85° produced antenna tips pointing LEFT (operator
     # feedback). To get tips-down we rotate ~90° further in the same direction
