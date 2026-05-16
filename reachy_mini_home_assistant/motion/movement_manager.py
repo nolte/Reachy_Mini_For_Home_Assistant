@@ -127,8 +127,12 @@ DEFAULT_IDLE_REST_POSE = {
     # → ~-175°. Possibly hitting mechanical limit; if so, the read will show
     # the actual end-stop. Beyond App-catalog envelope of ±90°, but the idle
     # pose doesn't route through clamp_to_envelope.
-    "antenna_left_rad": -3.229,    # app-world -185° → mechanical Servo-RIGHT -185° (10° beyond left)
-    "antenna_right_rad": -3.054,   # app-world -175° → mechanical Servo-LEFT -175°
+    # Hardware empirically clamps Servo at -180° — verified 2026-05-16 by
+    # sending -185° and observing -180.09° on the read. The 10° asymmetric
+    # offset between the two antennas is realised by pulling the LEFT antenna
+    # back 5° to -170° instead of pushing the right further.
+    "antenna_left_rad": -3.14159,  # app-world -180° → Servo-RIGHT -180° (hardware stop)
+    "antenna_right_rad": -2.967,   # app-world -170° → Servo-LEFT -170° (5° back from -175°)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
