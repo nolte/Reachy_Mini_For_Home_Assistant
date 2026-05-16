@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..core.config import Config
+from .idle_drift_watchdog import IdleDriftWatchdog
 from .pose_composer import clamp_body_yaw, compose_poses, create_head_pose_matrix, extract_yaw_from_pose
 from .state_machine import RobotState
 
@@ -270,6 +271,11 @@ def issue_control_command(manager: "MovementManager", head_pose: np.ndarray, ant
 def run_control_loop(manager: "MovementManager", *, max_control_dt_s: float, face_detected_threshold: float) -> None:
     logger.info("Movement manager control loop started (%.1f Hz)", manager._control_loop_hz)
     last_time = manager._now()
+    # Idle-pose drift watchdog: protects against external `goto`s leaving
+    # the robot in a foreign pose. Polls at ~1 Hz (every ~50 ticks at 50 Hz).
+    watchdog = IdleDriftWatchdog()
+    watchdog_tick_period_s = 1.0
+    last_watchdog_tick = manager._now()
     while not manager._stop_event.is_set():
         loop_start = manager._now()
         dt = min(max(0.0, loop_start - last_time), max_control_dt_s)
@@ -292,6 +298,11 @@ def run_control_loop(manager: "MovementManager", *, max_control_dt_s: float, fac
                 manager._update_idle_look_around()
                 head_pose, antennas, body_yaw = manager._compose_final_pose()
                 manager._issue_control_command(head_pose, antennas, body_yaw)
+            # Drift watchdog tick — wall-clock-throttled, skipped when in
+            # emotion / drain / pause (the watchdog itself rechecks too).
+            if loop_start - last_watchdog_tick >= watchdog_tick_period_s:
+                last_watchdog_tick = loop_start
+                watchdog.tick(manager, loop_start)
         except Exception as e:
             manager._log_error_throttled(f"Control loop error: {e}")
         sleep_time = max(0.0, manager._target_period - (manager._now() - loop_start))
