@@ -18,12 +18,27 @@ operator-facing units (mm, degrees) to these.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 from reachy_mini.utils import create_head_pose
 from reachy_mini.utils.interpolation import InterpolationTechnique
+
+# -----------------------------------------------------------------------------
+# Safe envelope (catalog.md §1). SDK-native units (m, rad).
+#
+# Owned here so both emotion_loader (boot-time validation) and emotion_player
+# (runtime defense-in-depth clamp) share one source of truth. Changing a
+# limit in one place must move it in the other.
+# -----------------------------------------------------------------------------
+
+MAX_TRANSLATION_M = 0.010
+MAX_PITCH_RAD = math.radians(25)
+MAX_YAW_RAD = math.radians(30)
+MAX_ROLL_RAD = math.radians(20)
+MAX_ANTENNA_RAD = math.radians(90)
+MAX_BODY_YAW_RAD = math.radians(20)
 
 
 @dataclass(frozen=True)
@@ -94,7 +109,7 @@ class Phase:
     easing: InterpolationTechnique = InterpolationTechnique.MIN_JERK
 
 
-def to_set_target(pose: EmotionPose) -> Tuple[np.ndarray, np.ndarray, float]:
+def to_set_target(pose: EmotionPose) -> tuple[np.ndarray, np.ndarray, float]:
     """Build the (head_matrix, antennas_array, body_yaw) tuple ready for
     ReachyMini.set_target(head=..., antennas=..., body_yaw=...).
 
@@ -114,6 +129,57 @@ def to_set_target(pose: EmotionPose) -> Tuple[np.ndarray, np.ndarray, float]:
     )
     antennas = np.array([pose.antenna_right, pose.antenna_left], dtype=np.float64)
     return head_matrix, antennas, float(pose.body_yaw)
+
+
+def clamp_to_envelope(pose: EmotionPose) -> tuple[EmotionPose, bool]:
+    """Clamp every axis to the safe envelope. Returns (clamped, did_clamp).
+
+    `did_clamp` is True iff at least one axis was outside the envelope.
+    The original `pose` is returned unchanged when nothing needed clamping
+    so callers can short-circuit on identity.
+
+    Acts as defense-in-depth behind the loader's _check_safe_envelope:
+    the loader rejects unsafe YAML at boot, but a runtime path that
+    reaches set_target with out-of-envelope values (e.g. a malformed
+    present-pose read from the SDK or a future bug in continuous
+    sampling) is silently clamped here so the hardware never sees the
+    bad value — paired with a one-time WARNING log at the call site.
+    """
+
+    def C(value: float, limit: float) -> tuple[float, bool]:
+        if value > limit:
+            return limit, True
+        if value < -limit:
+            return -limit, True
+        return value, False
+
+    x, cx = C(pose.x, MAX_TRANSLATION_M)
+    y, cy = C(pose.y, MAX_TRANSLATION_M)
+    z, cz = C(pose.z, MAX_TRANSLATION_M)
+    roll, cr = C(pose.roll, MAX_ROLL_RAD)
+    pitch, cp = C(pose.pitch, MAX_PITCH_RAD)
+    yaw, cyaw = C(pose.yaw, MAX_YAW_RAD)
+    ant_r, car = C(pose.antenna_right, MAX_ANTENNA_RAD)
+    ant_l, cal = C(pose.antenna_left, MAX_ANTENNA_RAD)
+    body_yaw, cby = C(pose.body_yaw, MAX_BODY_YAW_RAD)
+
+    did_clamp = any((cx, cy, cz, cr, cp, cyaw, car, cal, cby))
+    if not did_clamp:
+        return pose, False
+    return (
+        EmotionPose(
+            x=x,
+            y=y,
+            z=z,
+            roll=roll,
+            pitch=pitch,
+            yaw=yaw,
+            antenna_right=ant_r,
+            antenna_left=ant_l,
+            body_yaw=body_yaw,
+        ),
+        True,
+    )
 
 
 def from_present(

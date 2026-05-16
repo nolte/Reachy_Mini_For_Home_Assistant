@@ -82,10 +82,26 @@ def play_emotion(protocol: "VoiceSatelliteProtocol", emotion_name: str) -> None:
 
 def queue_emotion_move(protocol: "VoiceSatelliteProtocol", emotion_name: str) -> None:
     try:
-        if protocol.state.motion and protocol.state.motion.movement_manager:
-            movement_manager = protocol.state.motion.movement_manager
+        motion = protocol.state.motion
+        if motion is None:
+            _LOGGER.warning("Cannot play emotion: no motion controller available")
+            return
+
+        # Phase 2 wire-in: if the requested name is a YAML-defined emotion,
+        # play it via the new EmotionPlayer (per docs/refactor-emotion-pipeline-design.md).
+        # Otherwise fall back to the existing RecordedMoves path via MovementManager.
+        emotion_player = getattr(motion, "emotion_player", None)
+        if emotion_player is not None and emotion_name in emotion_player._emotions:
+            if emotion_player.play(emotion_name):
+                _LOGGER.info("Queued YAML emotion: %s (via EmotionPlayer)", emotion_name)
+            else:
+                _LOGGER.warning("EmotionPlayer rejected emotion: %s", emotion_name)
+            return
+
+        if motion.movement_manager is not None:
+            movement_manager = motion.movement_manager
             if movement_manager.queue_emotion_move(emotion_name):
-                _LOGGER.info("Queued emotion move: %s", emotion_name)
+                _LOGGER.info("Queued emotion move: %s (via RecordedMoves)", emotion_name)
             else:
                 _LOGGER.warning("Failed to queue emotion: %s", emotion_name)
         else:

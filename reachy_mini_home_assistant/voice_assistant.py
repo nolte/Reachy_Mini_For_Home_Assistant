@@ -188,6 +188,48 @@ class VoiceAssistantService:
             self._motion.movement_manager.set_idle_behavior_enabled(idle_enabled)
             _LOGGER.info("Idle behavior restored from preferences: %s", idle_enabled)
 
+        # Phase 2 wire-in: instantiate the EmotionPlayer that consumes the
+        # YAML-defined emotion catalog (reachy_mini_home_assistant/emotions/).
+        # See docs/refactor-emotion-pipeline-design.md §6 for the pause/resume
+        # protocol — we reuse the existing _emotion_playing_event flag on the
+        # MovementManager so its control loop skips set_target while the
+        # EmotionPlayer's worker thread owns the SDK.
+        try:
+            from pathlib import Path as _Path
+            from .motion.emotion_loader import load_emotions as _load_emotions
+            from .motion.emotion_player import EmotionPlayer as _EmotionPlayer
+
+            _emotions_dir = _Path(__file__).parent / "emotions"
+            _emotions = _load_emotions(_emotions_dir)
+            _mm = self._motion.movement_manager if self._motion else None
+
+            def _emotion_pause():
+                if _mm is not None:
+                    _mm._emotion_playing_event.set()
+
+            def _emotion_resume():
+                if _mm is not None:
+                    _mm._emotion_playing_event.clear()
+
+            self._motion.emotion_player = _EmotionPlayer(
+                reachy=self.reachy_mini,
+                emotions=_emotions,
+                on_pause=_emotion_pause,
+                on_resume=_emotion_resume,
+            )
+            _LOGGER.info(
+                "EmotionPlayer initialised with %d YAML emotion(s): %s",
+                len(_emotions),
+                sorted(_emotions.keys()),
+            )
+        except Exception as _emotion_init_err:
+            _LOGGER.warning(
+                "Could not initialise EmotionPlayer; YAML emotions will be unavailable: %s",
+                _emotion_init_err,
+            )
+            if self._motion is not None:
+                self._motion.emotion_player = None
+
         # Start Reachy Mini media system
         try:
             media = self.reachy_mini.media
@@ -581,11 +623,26 @@ class VoiceAssistantService:
             self._resume_non_esphome_services(reason="ha_connected")
 
     def _on_ha_disconnected(self) -> None:
-        """Called when Home Assistant disconnects."""
-        _LOGGER.warning("Home Assistant disconnected - suspending camera and voice services")
-        self._ha_connected = False
+        """Called when Home Assistant disconnects.
 
-        self._suspend_non_esphome_services(reason="ha_disconnected")
+        Intentionally a no-op for now. HA's ESPHome integration spawns
+        short-lived TCP probes from a separate IP that connect, perform no
+        ESPHome handshake, and disconnect within milliseconds. Each one
+        triggers Protocol.connection_lost on a fresh VoiceSatelliteProtocol
+        instance and fires this callback, even though the real session
+        connection is still alive. Tearing down camera / audio / motion on
+        every probe leaves the app stuck in "Services suspended - ESPHome
+        only" for the rest of the session, since no reconnect follows.
+
+        Until we can distinguish probe disconnects from real session ends
+        at the protocol layer (e.g. by tracking the active connection set
+        and only firing this when zero remain), keep the services running
+        and just record the state flag. Emotions, voice pipeline, and
+        camera keep working through probe storms. Empirically verified on
+        Pollen daemon 1.7.1 (Wireless), 2026-05-15.
+        """
+        _LOGGER.info("HA TCP disconnect event ignored (likely probe, services remain active)")
+        self._ha_connected = False
 
     async def stop(self) -> None:
         """Stop the voice assistant service."""

@@ -1,21 +1,44 @@
-# Single quick nod, for "command received". ~1 s total.
+# Double nod, deeper than the original single quick nod. ~2.4 s total.
+# Revised 2026-05-15: doubled the nod + deeper pitch for clear "got it".
 name: acknowledge
-description: Single quick nod ("got it")
+description: Double clear nod ("got it") with antennas perked
 type: one_shot
 phases:
-  - name: down
-    duration_s: 0.25
+  - name: down_1
+    duration_s: 0.40
     easing: min_jerk
     end:
-      z_mm: -3
-      pitch_deg: -10
-  - name: up
-    duration_s: 0.25
+      z_mm: -5
+      pitch_deg: -15
+      antenna_left_deg: 20
+      antenna_right_deg: -20
+  - name: up_1
+    duration_s: 0.40
     easing: min_jerk
     end:
-      z_mm: 2
-      pitch_deg: 3
+      z_mm: 3
+      pitch_deg: 5
+      antenna_left_deg: 25
+      antenna_right_deg: -25
+  - name: down_2
+    duration_s: 0.40
+    easing: min_jerk
+    end:
+      z_mm: -5
+      pitch_deg: -15
+      antenna_left_deg: 20
+      antenna_right_deg: -20
+  - name: up_2
+    duration_s: 0.40
+    easing: min_jerk
+    end:
+      z_mm: 3
+      pitch_deg: 5
+      antenna_left_deg: 25
+      antenna_right_deg: -25
   - name: home
-    duration_s: 0.50
+    duration_s: 0.80
     easing: min_jerk
-    end: {}
+    end:  # outward-V idle: app-world (+15, -15) → mechanical Servo[L=-15°, R=+15°]
+      antenna_left_deg: 15
+      antenna_right_deg: -15

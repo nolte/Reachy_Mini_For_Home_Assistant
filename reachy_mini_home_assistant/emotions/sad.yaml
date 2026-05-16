@@ -1,25 +1,28 @@
-# Head drop, antennas lowered, slow return. ~2.8 s total.
+# Head drop with antennas hanging, prolonged hold, slow return. ~4.4 s total.
+# Revised 2026-05-15: longer hold + deeper drop for visible "sadness".
 name: sad
-description: Head drop with antennas lowered, then slow return
+description: Head drop with antennas hanging, prolonged hold, slow return
 type: one_shot
 phases:
   - name: drop
-    duration_s: 0.60
-    easing: ease_in_out
-    end:
-      z_mm: -8
-      pitch_deg: -18
-      antenna_left_deg: -25
-      antenna_right_deg: 25
-  - name: hold
-    duration_s: 1.20
-    easing: linear
-    end:
-      z_mm: -8
-      pitch_deg: -18
-      antenna_left_deg: -25
-      antenna_right_deg: 25
-  - name: slow_rise
     duration_s: 1.00
     easing: ease_in_out
-    end: {}
+    end:
+      z_mm: -10
+      pitch_deg: -22
+      antenna_left_deg: -40
+      antenna_right_deg: 40
+  - name: hold
+    duration_s: 2.00
+    easing: linear
+    end:
+      z_mm: -10
+      pitch_deg: -22
+      antenna_left_deg: -40
+      antenna_right_deg: 40
+  - name: slow_rise
+    duration_s: 1.40
+    easing: ease_in_out
+    end:  # outward-V idle: app-world (+15, -15) → mechanical Servo[L=-15°, R=+15°]
+      antenna_left_deg: 15
+      antenna_right_deg: -15

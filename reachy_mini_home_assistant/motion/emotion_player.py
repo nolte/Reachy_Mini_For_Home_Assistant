@@ -21,14 +21,23 @@ Invariants:
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 from reachy_mini.utils.interpolation import time_trajectory
 
 from .emotion_loader import ContinuousEmotion, Emotion, OneShotEmotion, sample_continuous
-from .emotion_pose import EmotionPose, NEUTRAL, Phase, from_present, lerp_pose, to_set_target
+from .emotion_pose import (
+    NEUTRAL,
+    EmotionPose,
+    Phase,
+    clamp_to_envelope,
+    from_present,
+    lerp_pose,
+    to_set_target,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +46,21 @@ logger = logging.getLogger(__name__)
 # Defaults — see docs/refactor-emotion-pipeline-design.md §10 for rationale.
 # -----------------------------------------------------------------------------
 
-LEAD_IN_S = 0.5            # smooth pre-emotion → first animation pose
-EASE_OUT_S = 0.5           # smooth animation tail → rest pose
-TICK_S = 0.02              # 50 Hz, same as reference app
-PLAYBACK_SPEED = 0.5       # 0.5× = half speed; operator-confirmed default
+LEAD_IN_S = 0.5  # smooth pre-emotion → first animation pose
+EASE_OUT_S = 0.5  # smooth animation tail → rest pose
+TICK_S = 0.02  # 50 Hz, same as reference app
+PLAYBACK_SPEED = 0.5  # 0.5× = half speed; operator-confirmed default
+
+# Rate-limit / change-detect: don't push set_target faster than the
+# hardware can actually move. The Pollen WSClient pipeline silently
+# buffers commands when the daemon queue saturates (see today's
+# investigation in PR #4's review). Skipping no-op ticks reduces the
+# load enough that the saturation pattern stops triggering.
+SET_TARGET_DELTA_M = 0.0005  # 0.5 mm — below encoder noise
+SET_TARGET_DELTA_RAD = math.radians(0.5)  # 0.5° — below encoder noise
+SET_TARGET_HEARTBEAT_S = 0.2  # send at least once every 200 ms
+# (5 Hz floor; keeps SDK side
+# convinced the connection is live)
 
 
 class EmotionPlayer:
@@ -60,10 +80,10 @@ class EmotionPlayer:
     def __init__(
         self,
         reachy,
-        emotions: Dict[str, Emotion],
-        rest_pose_provider: Optional[Callable[[], EmotionPose]] = None,
-        on_pause: Optional[Callable[[], None]] = None,
-        on_resume: Optional[Callable[[], None]] = None,
+        emotions: dict[str, Emotion],
+        rest_pose_provider: Callable[[], EmotionPose] | None = None,
+        on_pause: Callable[[], None] | None = None,
+        on_resume: Callable[[], None] | None = None,
     ) -> None:
         """
         Args:
@@ -83,9 +103,20 @@ class EmotionPlayer:
         self._on_resume = on_resume
 
         self._lock = threading.Lock()
-        self._worker: Optional[threading.Thread] = None
+        self._worker: threading.Thread | None = None
         self._cancel_event = threading.Event()
-        self._current_emotion_name: Optional[str] = None
+        self._current_emotion_name: str | None = None
+
+        # Rate-limit state. Worker resets these on entry so each emotion
+        # starts with a fresh delta accounting.
+        self._last_sent_pose: EmotionPose | None = None
+        self._last_sent_ts: float = 0.0
+        self._skipped_ticks_in_a_row: int = 0
+        # Defense-in-depth clamp state. We log the first clamp per worker
+        # at WARNING (so it lands in production logs) and downgrade
+        # subsequent clamps to DEBUG to avoid log flooding under a stuck
+        # out-of-envelope condition.
+        self._clamp_warned_this_worker: bool = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -155,6 +186,13 @@ class EmotionPlayer:
     def _worker_main(self, emotion_name: str) -> None:
         """Owns reachy.set_target for the duration of this emotion."""
         emotion = self._emotions[emotion_name]
+        # Reset rate-limit state so the first tick of each new emotion
+        # always sends (no stale last_sent_pose from a previous emotion
+        # that might be within delta of the new lead-in start).
+        self._last_sent_pose = None
+        self._last_sent_ts = 0.0
+        self._skipped_ticks_in_a_row = 0
+        self._clamp_warned_this_worker = False
         logger.info("Started emotion %r", emotion_name)
         try:
             if self._on_pause is not None:
@@ -291,18 +329,115 @@ class EmotionPlayer:
     # ------------------------------------------------------------------
 
     def _apply(self, pose: EmotionPose) -> None:
-        """Push one pose to the SDK."""
-        head, antennas, body_yaw = to_set_target(pose)
+        """Push one pose to the SDK, but rate-limit no-op updates.
+
+        Skips the set_target call when the new pose is within the
+        encoder-noise threshold of the last sent pose, unless the
+        last send was more than SET_TARGET_HEARTBEAT_S ago.
+
+        This is the workaround for the Pollen WSClient saturation
+        bug: at 50 Hz blind sending, the daemon's command queue
+        eventually saturates and silently drops follow-up commands.
+        By only sending when the pose actually moved, we let the
+        daemon catch up and avoid the silent stall.
+
+        Defense-in-depth: every pose is run through clamp_to_envelope
+        before set_target. The loader already rejects YAML that could
+        leave the envelope, so a clamp here means either a malformed
+        present-pose read or a future bug. We WARN once per worker so
+        operators see it, then DEBUG-log subsequent clamps to avoid
+        flooding when the condition is persistent.
+        """
+        clamped, did_clamp = clamp_to_envelope(pose)
+        if did_clamp:
+            if not self._clamp_warned_this_worker:
+                logger.warning(
+                    "EmotionPlayer: pose clamped to safe envelope "
+                    "(this should not happen — loader is supposed to "
+                    "catch out-of-envelope values); original=%r clamped=%r",
+                    pose,
+                    clamped,
+                )
+                self._clamp_warned_this_worker = True
+            else:
+                logger.debug(
+                    "EmotionPlayer: pose clamped again; original=%r clamped=%r",
+                    pose,
+                    clamped,
+                )
+
+        if self._pose_unchanged(clamped):
+            self._skipped_ticks_in_a_row += 1
+            return
+
+        if self._skipped_ticks_in_a_row > 0:
+            logger.debug(
+                "EmotionPlayer: skipped %d static ticks before next set_target",
+                self._skipped_ticks_in_a_row,
+            )
+            self._skipped_ticks_in_a_row = 0
+
+        head, antennas, body_yaw = to_set_target(clamped)
         self._reachy.set_target(head=head, antennas=antennas, body_yaw=body_yaw)
+        self._last_sent_pose = clamped
+        self._last_sent_ts = time.monotonic()
+
+    def _pose_unchanged(self, pose: EmotionPose) -> bool:
+        """True iff `pose` is within delta thresholds of the last sent pose
+        AND the heartbeat-interval has not yet elapsed since the last send."""
+        if self._last_sent_pose is None:
+            return False
+        if time.monotonic() - self._last_sent_ts >= SET_TARGET_HEARTBEAT_S:
+            return False
+        prev = self._last_sent_pose
+        # Translation deltas (metres)
+        if abs(pose.x - prev.x) > SET_TARGET_DELTA_M:
+            return False
+        if abs(pose.y - prev.y) > SET_TARGET_DELTA_M:
+            return False
+        if abs(pose.z - prev.z) > SET_TARGET_DELTA_M:
+            return False
+        # Angular deltas (radians)
+        if abs(pose.roll - prev.roll) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.pitch - prev.pitch) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.yaw - prev.yaw) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.antenna_left - prev.antenna_left) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.antenna_right - prev.antenna_right) > SET_TARGET_DELTA_RAD:
+            return False
+        if abs(pose.body_yaw - prev.body_yaw) > SET_TARGET_DELTA_RAD:
+            return False
+        return True
 
     def _read_present_pose_safe(self) -> EmotionPose:
         """Read the real current pose from the SDK; falls back to NEUTRAL
-        if the SDK call fails so the worker is never blocked by a transient
-        read error."""
+        if the SDK call fails OR if the read value is outside the safe
+        envelope (which means the HW is in sleep / disabled and is sitting
+        at a pose like pitch≈27°, antenna≈±175°, z≈-46mm that we never want
+        to use as the starting point of a Lerp).
+
+        Using such a pose as the Lerp start would produce out-of-envelope
+        intermediate samples for the entire Lead-In, which the runtime clamp
+        in `_apply` would then quench into a hard mechanical jump. Falling
+        back to NEUTRAL keeps every Lerp tick inside the envelope by
+        construction.
+        """
         try:
             head_mat = self._reachy.get_current_head_pose()
             antennas = self._reachy.get_present_antenna_joint_positions()
-            return from_present(head_mat, antennas, body_yaw=0.0)
+            present = from_present(head_mat, antennas, body_yaw=0.0)
         except Exception as e:
             logger.warning("Could not read present pose; falling back to NEUTRAL: %s", e)
             return NEUTRAL
+        _, out_of_envelope = clamp_to_envelope(present)
+        if out_of_envelope:
+            logger.warning(
+                "Present pose outside safe envelope (HW likely in sleep/disabled); "
+                "falling back to NEUTRAL as Lerp start to avoid a clamped jump. raw=%r",
+                present,
+            )
+            return NEUTRAL
+        return present

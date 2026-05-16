@@ -115,8 +115,20 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": 0.0,
-    "antenna_left_rad": 0.0,
-    "antenna_right_rad": 0.0,
+    # FIX 2026-05-16 (round 2): the app-world variables `antenna_left` /
+    # `antenna_right` are SIGN-MIRRORED vs the mechanical hardware because
+    # the SDK source-comment "antennas=[right, left]" disagrees with the
+    # WS protocol which actually expects [left, right]. The SDK passes the
+    # list unmodified, so the app-named `antenna_left` ends up driving the
+    # mechanical "right" servo and vice versa. Every existing choreography
+    # in the repo already accounts for this (e.g. listening: left=+20,
+    # right=-20 produces outward-V mechanically). The idle-rest-pose
+    # therefore needs the same convention: left=+0.2618 / right=-0.2618
+    # gives Servo[left=-, right=+] = outward-V (Eselsohren), gravity-
+    # symmetric and visually correct. The opposite sign pair (left=-0.2618
+    # / right=+0.2618) would give inward-V — stable but visually wrong.
+    "antenna_left_rad": 0.2618,    # app-world +15° → mechanical Servo-left -15° (outward)
+    "antenna_right_rad": -0.2618,  # app-world -15° → mechanical Servo-right +15° (outward)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
@@ -1040,9 +1052,14 @@ class MovementManager:
             logger.warning("Could not enable motors on startup: %s", motor_err)
 
         # Reset to neutral position first (handles restart after crash/disconnect)
-        # This ensures head returns to center on app startup
-        self.reset_to_neutral(duration=0.5)
-        logger.info("Reset to neutral position on startup")
+        # This ensures head returns to center on app startup.
+        # FIX 2026-05-15: duration was 0.5s. From Sleep-Pose (antennas ±175°)
+        # that is ~350°/s, which trips the Dynamixel XL330-M077-T Overload
+        # Error on the antenna motors. The motors then silently ignore all
+        # subsequent commands until a daemon restart — set_target calls return
+        # ok but the servos don't move. 3.0s is a safe ramp from any HW state.
+        self.reset_to_neutral(duration=3.0)
+        logger.info("Reset to neutral position on startup (3s safe ramp)")
 
         # Initialize idle animation immediately so breathing starts on launch
         # This matches the reference project's behavior where BreathingMove

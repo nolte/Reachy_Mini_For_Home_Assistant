@@ -1,30 +1,33 @@
-# Head tilts to one side, holds, returns. ~2.5 s total.
+# Strong asymmetric head tilt with longer hold, returns. ~3.7 s total.
 # Asymmetric antenna values give a "perked one ear" effect.
+# Revised 2026-05-15: stronger tilt + longer hold for clear "hmm?".
 name: curious
-description: Asymmetric head tilt with brief hold ("hmm?")
+description: Strong asymmetric head tilt + perked antenna, prolonged hold
 type: one_shot
 phases:
   - name: tilt
-    duration_s: 0.45
+    duration_s: 0.70
     easing: ease_in_out
     end:
-      z_mm: 3
-      roll_deg: 15
-      pitch_deg: 3
-      yaw_deg: -20
-      antenna_left_deg: 25
-      antenna_right_deg: -10
+      z_mm: 5
+      roll_deg: 18
+      pitch_deg: 5
+      yaw_deg: -25
+      antenna_left_deg: 45
+      antenna_right_deg: -15
   - name: hold
-    duration_s: 1.20
+    duration_s: 1.80
     easing: linear
     end:
-      z_mm: 3
-      roll_deg: 15
-      pitch_deg: 3
-      yaw_deg: -20
-      antenna_left_deg: 25
-      antenna_right_deg: -10
+      z_mm: 5
+      roll_deg: 18
+      pitch_deg: 5
+      yaw_deg: -25
+      antenna_left_deg: 45
+      antenna_right_deg: -15
   - name: home
-    duration_s: 0.85
+    duration_s: 1.20
     easing: min_jerk
-    end: {}
+    end:  # outward-V idle: app-world (+15, -15) → mechanical Servo[L=-15°, R=+15°]
+      antenna_left_deg: 15
+      antenna_right_deg: -15
