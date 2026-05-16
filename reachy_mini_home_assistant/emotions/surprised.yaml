@@ -1,0 +1,35 @@
+# Quick recoil + antennas snap up + brief hold + return. ~1.4 s total.
+name: surprised
+description: Quick recoil with antennas snapping up
+type: one_shot
+phases:
+  - name: recoil
+    duration_s: 0.15
+    easing: cartoon
+    end:
+      x_mm: -3
+      z_mm: 5
+      pitch_deg: 20
+      antenna_left_deg: 75
+      antenna_right_deg: -75
+  - name: hold
+    duration_s: 0.45
+    easing: linear
+    end:
+      x_mm: -3
+      z_mm: 5
+      pitch_deg: 20
+      antenna_left_deg: 75
+      antenna_right_deg: -75
+  - name: settle
+    duration_s: 0.30
+    easing: min_jerk
+    end:
+      z_mm: 2
+      pitch_deg: 5
+      antenna_left_deg: 30
+      antenna_right_deg: -30
+  - name: home
+    duration_s: 0.50
+    easing: min_jerk
+    end: {}

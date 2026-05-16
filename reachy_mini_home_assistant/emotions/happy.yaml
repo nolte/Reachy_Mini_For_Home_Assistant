@@ -1,0 +1,49 @@
+# Joyful head lift with antenna flare. ~2 s total.
+name: happy
+description: Joyful head lift with antenna flare and a small bob
+type: one_shot
+phases:
+  - name: lift
+    duration_s: 0.30
+    easing: cartoon
+    end:
+      z_mm: 8
+      pitch_deg: 12
+      antenna_left_deg: 45
+      antenna_right_deg: -45
+  - name: hold
+    duration_s: 0.40
+    easing: linear
+    end:
+      z_mm: 8
+      pitch_deg: 12
+      antenna_left_deg: 45
+      antenna_right_deg: -45
+  - name: bob_down
+    duration_s: 0.25
+    easing: min_jerk
+    end:
+      z_mm: 3
+      pitch_deg: 8
+      antenna_left_deg: 35
+      antenna_right_deg: -35
+  - name: bob_up
+    duration_s: 0.25
+    easing: min_jerk
+    end:
+      z_mm: 8
+      pitch_deg: 12
+      antenna_left_deg: 45
+      antenna_right_deg: -45
+  - name: bob_down_2
+    duration_s: 0.25
+    easing: min_jerk
+    end:
+      z_mm: 3
+      pitch_deg: 8
+      antenna_left_deg: 35
+      antenna_right_deg: -35
+  - name: home
+    duration_s: 0.50
+    easing: min_jerk
+    end: {}

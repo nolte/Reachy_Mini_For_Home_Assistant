@@ -1,0 +1,41 @@
+# Slow head shake "no", for "command failed / unintelligible". ~2 s total.
+name: error
+description: Slow head-shake "no" for command failures
+type: one_shot
+phases:
+  - name: left_1
+    duration_s: 0.30
+    easing: ease_in_out
+    end:
+      pitch_deg: -3
+      yaw_deg: -18
+      antenna_left_deg: -10
+      antenna_right_deg: 10
+  - name: right_1
+    duration_s: 0.40
+    easing: ease_in_out
+    end:
+      pitch_deg: -3
+      yaw_deg: 18
+      antenna_left_deg: 10
+      antenna_right_deg: -10
+  - name: left_2
+    duration_s: 0.40
+    easing: ease_in_out
+    end:
+      pitch_deg: -3
+      yaw_deg: -18
+      antenna_left_deg: -10
+      antenna_right_deg: 10
+  - name: right_2
+    duration_s: 0.40
+    easing: ease_in_out
+    end:
+      pitch_deg: -3
+      yaw_deg: 18
+      antenna_left_deg: 10
+      antenna_right_deg: -10
+  - name: home
+    duration_s: 0.50
+    easing: min_jerk
+    end: {}

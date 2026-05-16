@@ -1,0 +1,30 @@
+# Head tilts to one side, holds, returns. ~2.5 s total.
+# Asymmetric antenna values give a "perked one ear" effect.
+name: curious
+description: Asymmetric head tilt with brief hold ("hmm?")
+type: one_shot
+phases:
+  - name: tilt
+    duration_s: 0.45
+    easing: ease_in_out
+    end:
+      z_mm: 3
+      roll_deg: 15
+      pitch_deg: 3
+      yaw_deg: -20
+      antenna_left_deg: 25
+      antenna_right_deg: -10
+  - name: hold
+    duration_s: 1.20
+    easing: linear
+    end:
+      z_mm: 3
+      roll_deg: 15
+      pitch_deg: 3
+      yaw_deg: -20
+      antenna_left_deg: 25
+      antenna_right_deg: -10
+  - name: home
+    duration_s: 0.85
+    easing: min_jerk
+    end: {}

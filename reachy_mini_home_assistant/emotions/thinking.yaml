@@ -1,0 +1,17 @@
+# Head tilts side-to-side slowly while STT/TTS is in flight.
+name: thinking
+description: Slow side-to-side head tilt — processing
+type: continuous
+loops: true
+static_offset:
+  z_mm: 3
+  antenna_left_deg: 15
+  antenna_right_deg: -15
+oscillators:
+  - field: yaw_deg
+    amplitude: 8
+    frequency_hz: 0.25
+  - field: roll_deg
+    amplitude: 4
+    frequency_hz: 0.25
+    phase_offset_rad: 1.5707963     # π/2 — quarter-period offset

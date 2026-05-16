@@ -1,0 +1,25 @@
+# Lively head movement while TTS plays. Higher frequency than idle/thinking.
+name: speaking
+description: Lively head motion while text-to-speech is playing
+type: continuous
+loops: true
+static_offset:
+  antenna_left_deg: 30
+  antenna_right_deg: -30
+oscillators:
+  - field: z_mm
+    amplitude: 4
+    frequency_hz: 1.0
+  - field: pitch_deg
+    amplitude: 2
+    frequency_hz: 1.0
+  - field: yaw_deg
+    amplitude: 3
+    frequency_hz: 0.5            # slower than vertical for naturalness
+  - field: antenna_left_deg
+    amplitude: 5
+    frequency_hz: 0.5
+  - field: antenna_right_deg
+    amplitude: 5
+    frequency_hz: 0.5
+    phase_offset_rad: 3.14159265

@@ -52,6 +52,9 @@ dependencies = [
     "pillow<12.0",
     "pydantic<=2.12.5",
     "requests>=2.33.0",
+
+    # YAML emotion definitions (motion/emotion_loader.py)
+    "PyYAML>=6.0",
 ]
 keywords = ["reachy-mini-app", "reachy-mini", "home-assistant", "voice-assistant"]
 
