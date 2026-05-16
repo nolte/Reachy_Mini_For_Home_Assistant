@@ -51,7 +51,7 @@
         "y_m": 0.0,
         "z_m": -0.055,
         "antenna_left_rad": -3.141592653589793,
-        "antenna_right_rad": -3.1241393610699604
+        "antenna_right_rad": -3.141592653589793
     },
     "emotions": {
         "happy": {

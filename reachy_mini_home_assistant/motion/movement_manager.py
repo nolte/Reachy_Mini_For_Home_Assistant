@@ -135,8 +135,13 @@ DEFAULT_IDLE_REST_POSE = {
     # servo is *at* the stop (-180°), the left at -178° — 2° off so we keep
     # the slight asymmetry visually, but close enough that mechanical
     # pressure against the stop damps gravity-induced wobble.
+    # Both antennas at hardware stop (Servo -180° each). 2° and 1° margins
+    # both proved unreliable for wobble suppression (0.5-0.6° peak-to-peak
+    # depending on which encoder step the servo lands on). Only the AT-stop
+    # pose gives bit-identical reads, because the motor's continuous push
+    # against the mechanical stop dampens any servo-quantization tanzen.
     "antenna_left_rad": -3.14159,  # app-world -180° → Servo-RIGHT -180° (hardware stop)
-    "antenna_right_rad": -3.12414, # app-world -179° → Servo-LEFT -179° (1° off stop; 2° margin proved unstable 2026-05-16)
+    "antenna_right_rad": -3.14159, # app-world -180° → Servo-LEFT  -180° (hardware stop)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
