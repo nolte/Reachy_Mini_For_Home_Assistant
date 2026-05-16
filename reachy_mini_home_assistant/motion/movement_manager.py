@@ -121,8 +121,11 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": -0.012,                 # head lowered by 12 mm
-    "antenna_left_rad": -0.2618,   # app-world -15° → mechanical Servo-left +15° (inward)
-    "antenna_right_rad": 0.2618,   # app-world +15° → mechanical Servo-right -15° (inward)
+    # Antennas pushed to strong-inward (Servo[L=+40°, R=-40°]) so the tips hang
+    # together pointing down/inward, evoking the "drawn-in / dozing" look that
+    # `sad.yaml drop` uses for its sad pose. Same antenna-mirror convention.
+    "antenna_left_rad": -0.6981,   # app-world -40° → mechanical Servo-left +40° (strong inward)
+    "antenna_right_rad": 0.6981,   # app-world +40° → mechanical Servo-right -40° (strong inward)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
