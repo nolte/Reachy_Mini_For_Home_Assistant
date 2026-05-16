@@ -131,8 +131,12 @@ DEFAULT_IDLE_REST_POSE = {
     # sending -185° and observing -180.09° on the read. The 10° asymmetric
     # offset between the two antennas is realised by pulling the LEFT antenna
     # back 5° to -170° instead of pushing the right further.
+    # Both antennas now close to or at the -180° hardware stop. The right
+    # servo is *at* the stop (-180°), the left at -178° — 2° off so we keep
+    # the slight asymmetry visually, but close enough that mechanical
+    # pressure against the stop damps gravity-induced wobble.
     "antenna_left_rad": -3.14159,  # app-world -180° → Servo-RIGHT -180° (hardware stop)
-    "antenna_right_rad": -2.967,   # app-world -170° → Servo-LEFT -170° (5° back from -175°)
+    "antenna_right_rad": -3.10669, # app-world -178° → Servo-LEFT -178° (2° off stop, wobble-damped)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"
