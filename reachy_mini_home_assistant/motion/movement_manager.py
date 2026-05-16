@@ -121,13 +121,16 @@ DEFAULT_IDLE_REST_POSE = {
     "x_m": 0.0,
     "y_m": 0.0,
     "z_m": -0.025,                 # head lowered by 25 mm (deeper tuck)
-    # Antennas pushed to MAX inward (Servo[L=+85°, R=-85°], near catalog envelope
-    # of ±90°). At this magnitude the antennas cross above the head — the tips
-    # fall behind the head and point downward/backward. Same antenna-mirror
-    # convention. ±85° is also what `surprised.yaml recoil` uses (in opposite
-    # signs), so we know it's within mechanical safe range.
-    "antenna_left_rad": -1.4835,   # app-world -85° → mechanical Servo-left +85° (max inward, crossed)
-    "antenna_right_rad": 1.4835,   # app-world +85° → mechanical Servo-right -85° (max inward, crossed)
+    # Antennas at SAME-SIGN max negative (App[-85°, -85°] → Servo[+85°, +85°]).
+    # Both antennas tilted the same direction simultaneously — instead of
+    # crossing above the head (inward) or splaying sideways (outward), they
+    # both kip into the same plane. Goal: tips pointing straight down (or as
+    # close as the Servo axis allows). NB: same-sign is mechanically
+    # asymmetric to gravity (see antenna-servo-zero-wobble memory) — at ±85°
+    # near mechanical limit the wobble effect is likely smaller than at ±15°,
+    # but worth verifying live with a bit-identity multi-read.
+    "antenna_left_rad": -1.4835,   # app-world -85° → mechanical Servo-left +85°
+    "antenna_right_rad": -1.4835,  # app-world -85° → mechanical Servo-right +85° (same-sign!)
 }
 
 _ANIMATION_CONFIG_FILE = Path(__file__).resolve().parent.parent / "animations" / "conversation_animations.json"

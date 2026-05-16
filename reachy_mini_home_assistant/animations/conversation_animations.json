@@ -43,7 +43,7 @@
         }
     },
     "idle_rest_pose": {
-        "description": "EXPERIMENT 2026-05-16 — DEEPLY tucked / drawn-in idle pose. Head pitched chin-DOWN (+20°) and Stewart-platform lowered by 25 mm (deep tuck). Antennas at MAX inward (Servo[L=+85°/R=-85°], near ±90° envelope) so the tips cross over the head and point down/backward. Same antenna-mirror convention as outward-V.",
+        "description": "EXPERIMENT 2026-05-16 — DEEPLY tucked / drawn-in idle pose with SAME-SIGN antennas (App[-85°, -85°] → Servo[+85°, +85°]). Both antennas tilted in the same direction simultaneously to try to produce tips-pointing-straight-down. Head pitched chin-DOWN (+20°) and Stewart-platform lowered by 25 mm. Same-sign antennas are mechanically asymmetric to gravity — wobble verification needed.",
         "pitch_deg": 20.0,
         "yaw_deg": 0.0,
         "roll_deg": 0.0,
@@ -51,7 +51,7 @@
         "y_m": 0.0,
         "z_m": -0.025,
         "antenna_left_rad": -1.4835298641951802,
-        "antenna_right_rad": 1.4835298641951802
+        "antenna_right_rad": -1.4835298641951802
     },
     "emotions": {
         "happy": {
